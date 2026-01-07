@@ -1,14 +1,17 @@
 /**
  * Solnado Private Send Server
  * 
- * Uses PrivacyCash for ZK private transfers
+ * Flow:
+ * 1. User signs deposit to pool address
+ * 2. Server receives funds and does PrivacyCash deposit+withdraw
+ * 3. Recipient gets funds with no on-chain link to sender
  */
 
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
+import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
 import bs58 from 'bs58';
 
 // @ts-ignore
@@ -21,40 +24,53 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const RPC_URL = process.env.RPC_URL || 'https://mainnet.helius-rpc.com/?api-key=da8de8e3-afd3-457e-9820-a62102ca3c9b';
 
-// Relayer wallet - pays for withdraw tx, gets reimbursed via deposit
+// Relayer wallet - receives user deposits, does PrivacyCash flow
 const RELAYER_KEY = process.env.RELAYER_PRIVATE_KEY;
+let relayerKeypair: Keypair | null = null;
+
+if (RELAYER_KEY) {
+  try {
+    relayerKeypair = Keypair.fromSecretKey(bs58.decode(RELAYER_KEY));
+    console.log(`Relayer: ${relayerKeypair.publicKey.toBase58()}`);
+  } catch (e) {
+    console.error('Invalid RELAYER_PRIVATE_KEY');
+  }
+}
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Track pending sends
-const pendingSends = new Map<string, {
-  status: 'pending' | 'depositing' | 'withdrawing' | 'complete' | 'failed';
+// Session storage
+const sessions = new Map<string, {
+  senderAddress: string;
+  recipientAddress: string;
+  amountLamports: number;
+  step: 'pending' | 'depositing' | 'withdrawing' | 'complete' | 'failed';
   depositTx?: string;
   withdrawTx?: string;
   error?: string;
 }>();
 
 /**
- * POST /api/private-send
- * 
- * Full privacy flow using PrivacyCash:
- * 1. Sender deposits to pool (includes relayer fee)
- * 2. Relayer withdraws to recipient with ZK proof
+ * POST /api/prepare-deposit
+ * Build unsigned transaction for user to sign
  */
-app.post('/api/private-send', async (req, res) => {
-  const { senderPrivateKey, recipientAddress, amountSol } = req.body;
+app.post('/api/prepare-deposit', async (req, res) => {
+  const { senderAddress, recipientAddress, amountSol } = req.body;
 
-  if (!senderPrivateKey || !recipientAddress || !amountSol) {
-    return res.status(400).json({ error: 'Missing required fields' });
+  if (!senderAddress || !recipientAddress || !amountSol) {
+    return res.status(400).json({ error: 'Missing fields' });
   }
 
-  // Validate
+  if (!relayerKeypair) {
+    return res.status(500).json({ error: 'Relayer not configured' });
+  }
+
   try {
     new PublicKey(recipientAddress);
   } catch {
-    return res.status(400).json({ error: 'Invalid recipient address' });
+    return res.status(400).json({ error: 'Invalid recipient' });
   }
 
   const amountLamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
@@ -62,107 +78,161 @@ app.post('/api/private-send', async (req, res) => {
     return res.status(400).json({ error: 'Minimum 0.01 SOL' });
   }
 
-  const txId = `tx_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  pendingSends.set(txId, { status: 'pending' });
-
-  // Process async - return immediately
-  processPrivateSend(txId, senderPrivateKey, recipientAddress, amountLamports);
-
-  res.json({ txId, status: 'pending' });
-});
-
-/**
- * GET /api/tx/:txId
- * Check transaction status
- */
-app.get('/api/tx/:txId', (req, res) => {
-  const tx = pendingSends.get(req.params.txId);
-  if (!tx) {
-    return res.status(404).json({ error: 'Not found' });
-  }
-  res.json(tx);
-});
-
-/**
- * GET /api/balance/:address
- */
-app.get('/api/balance/:address', async (req, res) => {
   try {
     const connection = new Connection(RPC_URL, 'confirmed');
-    const balance = await connection.getBalance(new PublicKey(req.params.address));
-    res.json({ balance: balance / LAMPORTS_PER_SOL });
+    const sender = new PublicKey(senderAddress);
+
+    // User sends to relayer pool address
+    const tx = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: sender,
+        toPubkey: relayerKeypair.publicKey,
+        lamports: amountLamports
+      })
+    );
+
+    const { blockhash } = await connection.getLatestBlockhash();
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = sender;
+
+    const serialized = tx.serialize({ requireAllSignatures: false });
+    const base64Tx = Buffer.from(serialized).toString('base64');
+
+    // Create session
+    const sessionId = `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    sessions.set(sessionId, {
+      senderAddress,
+      recipientAddress,
+      amountLamports,
+      step: 'pending'
+    });
+
+    // Clean up after 10 min
+    setTimeout(() => sessions.delete(sessionId), 10 * 60 * 1000);
+
+    console.log(`[${sessionId}] Prepared: ${amountSol} SOL to ${recipientAddress}`);
+
+    res.json({ sessionId, unsignedTx: base64Tx });
+
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    console.error('Prepare error:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
 /**
- * Process private send via PrivacyCash
+ * POST /api/submit-deposit
+ * Submit signed transaction and start privacy flow
  */
-async function processPrivateSend(
-  txId: string,
-  senderPrivateKey: string,
-  recipientAddress: string,
-  amountLamports: number
+app.post('/api/submit-deposit', async (req, res) => {
+  const { signedTx, sessionId } = req.body;
+
+  if (!signedTx || !sessionId) {
+    return res.status(400).json({ error: 'Missing fields' });
+  }
+
+  const session = sessions.get(sessionId);
+  if (!session) {
+    return res.status(400).json({ error: 'Session expired' });
+  }
+
+  if (!relayerKeypair) {
+    return res.status(500).json({ error: 'Relayer not configured' });
+  }
+
+  try {
+    const connection = new Connection(RPC_URL, 'confirmed');
+    const txBuffer = Buffer.from(signedTx, 'base64');
+
+    // Submit user's deposit to relayer
+    session.step = 'depositing';
+    console.log(`[${sessionId}] Submitting user deposit...`);
+
+    const depositTx = await connection.sendRawTransaction(txBuffer, {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed'
+    });
+
+    await connection.confirmTransaction(depositTx, 'confirmed');
+    session.depositTx = depositTx;
+    console.log(`[${sessionId}] User deposit confirmed: ${depositTx}`);
+
+    // Start async privacy flow
+    processPrivacyFlow(sessionId, session, relayerKeypair);
+
+    res.json({ success: true, depositTx });
+
+  } catch (err: any) {
+    console.error(`[${sessionId}] Submit error:`, err);
+    session.step = 'failed';
+    session.error = err.message;
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/status/:sessionId
+ */
+app.get('/api/status/:sessionId', (req, res) => {
+  const session = sessions.get(req.params.sessionId);
+  if (!session) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  res.json({
+    step: session.step,
+    depositTx: session.depositTx,
+    withdrawTx: session.withdrawTx,
+    error: session.error
+  });
+});
+
+/**
+ * Process the PrivacyCash deposit+withdraw flow
+ */
+async function processPrivacyFlow(
+  sessionId: string,
+  session: typeof sessions extends Map<string, infer V> ? V : never,
+  relayer: Keypair
 ) {
   try {
-    const senderKeypair = Keypair.fromSecretKey(bs58.decode(senderPrivateKey));
-    
-    console.log(`\n[${txId}] Private Send Started`);
-    console.log(`  From: ${senderKeypair.publicKey.toBase58()}`);
-    console.log(`  To: ${recipientAddress}`);
-    console.log(`  Amount: ${amountLamports / LAMPORTS_PER_SOL} SOL`);
+    console.log(`[${sessionId}] Starting PrivacyCash flow...`);
+    session.step = 'withdrawing';
 
-    // Initialize PrivacyCash with sender's key
+    // Initialize PrivacyCash with relayer's key
     const privacyCash = new PrivacyCash({
       RPC_url: RPC_URL,
-      owner: Array.from(senderKeypair.secretKey),
+      owner: Array.from(relayer.secretKey),
       enableDebug: false
     });
 
-    // Step 1: Deposit to shielded pool
-    pendingSends.set(txId, { status: 'depositing' });
-    console.log(`[${txId}] Depositing to pool...`);
-    
+    // Relayer deposits to pool
+    console.log(`[${sessionId}] Relayer depositing to pool...`);
     const depositResult = await privacyCash.deposit({
-      lamports: amountLamports
+      lamports: session.amountLamports
     });
-    
-    console.log(`[${txId}] Deposit TX: ${depositResult?.tx}`);
-    pendingSends.set(txId, { 
-      status: 'withdrawing',
-      depositTx: depositResult?.tx
-    });
+    console.log(`[${sessionId}] Pool deposit: ${depositResult?.tx}`);
 
-    // Wait for pool state to update
+    // Wait for pool state
     await new Promise(r => setTimeout(r, 5000));
 
-    // Step 2: Withdraw to recipient with ZK proof
-    console.log(`[${txId}] Withdrawing to recipient...`);
-    
-    const relayerFee = 2_000_000; // 0.002 SOL fee
-    const withdrawAmount = amountLamports - relayerFee;
+    // Withdraw to recipient with ZK proof
+    console.log(`[${sessionId}] Withdrawing to ${session.recipientAddress}...`);
+    const relayerFee = 2_000_000; // 0.002 SOL
+    const withdrawAmount = session.amountLamports - relayerFee;
 
     const withdrawResult = await privacyCash.withdraw({
       lamports: withdrawAmount,
-      recipientAddress: recipientAddress
+      recipientAddress: session.recipientAddress
     });
 
-    console.log(`[${txId}] Withdraw TX: ${withdrawResult?.tx}`);
-    console.log(`[${txId}] Complete!`);
-
-    pendingSends.set(txId, {
-      status: 'complete',
-      depositTx: depositResult?.tx,
-      withdrawTx: withdrawResult?.tx
-    });
+    session.withdrawTx = withdrawResult?.tx;
+    session.step = 'complete';
+    console.log(`[${sessionId}] Complete! Withdraw: ${withdrawResult?.tx}`);
 
   } catch (err: any) {
-    console.error(`[${txId}] Error:`, err.message);
-    pendingSends.set(txId, {
-      status: 'failed',
-      error: err.message
-    });
+    console.error(`[${sessionId}] Privacy flow error:`, err);
+    session.step = 'failed';
+    session.error = err.message;
   }
 }
 
@@ -181,7 +251,8 @@ app.listen(PORT, () => {
   --------------
   Port: ${PORT}
   RPC:  ${RPC_URL.slice(0, 50)}...
+  Relayer: ${relayerKeypair?.publicKey.toBase58() || 'NOT CONFIGURED'}
   
-  Ready for private transfers.
+  Set RELAYER_PRIVATE_KEY env var for private transfers.
   `);
 });

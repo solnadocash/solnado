@@ -39,38 +39,25 @@
       width: 100%;
       max-width: 420px;
     }
-    h1 {
-      font-size: 18px;
-      font-weight: 500;
-      letter-spacing: -0.5px;
-      margin-bottom: 6px;
+    h1 { font-size: 18px; font-weight: 500; margin-bottom: 6px; }
+    .tagline { color: var(--muted); font-size: 11px; margin-bottom: 24px; }
+    .balance-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
     }
-    .tagline {
-      color: var(--muted);
-      font-size: 11px;
-      margin-bottom: 24px;
-      letter-spacing: 0.5px;
-    }
-    .warning {
-      background: rgba(139, 88, 58, 0.15);
-      border: 1px solid #5a4a3d;
-      color: #b89a7a;
-      padding: 12px;
-      border-radius: 4px;
-      font-size: 11px;
-      margin-bottom: 20px;
-      line-height: 1.5;
-    }
-    .form-group {
-      margin-bottom: 16px;
-    }
+    .balance-row:last-of-type { margin-bottom: 20px; }
+    .balance-label { color: var(--muted); }
+    .balance-value { color: var(--text); }
+    .form-group { margin-bottom: 16px; }
     label {
       display: block;
       font-size: 11px;
       color: var(--muted);
       margin-bottom: 6px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
     }
     input {
       width: 100%;
@@ -97,17 +84,11 @@
       font-weight: 500;
       cursor: pointer;
       margin-top: 8px;
-      letter-spacing: 0.5px;
       transition: background 0.15s;
     }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn:hover:not(:disabled) { background: var(--green); }
-    .hint {
-      text-align: center;
-      font-size: 10px;
-      color: var(--muted);
-      margin-top: 16px;
-    }
+    .hint { text-align: center; font-size: 10px; color: var(--muted); margin-top: 16px; }
     .status {
       margin-top: 16px;
       padding: 12px;
@@ -115,25 +96,12 @@
       font-size: 12px;
       line-height: 1.6;
     }
-    .status-info {
-      background: rgba(74, 124, 74, 0.1);
-      border: 1px solid var(--accent);
-      color: var(--green);
-    }
-    .status-success {
-      background: rgba(74, 124, 74, 0.15);
-      border: 1px solid var(--green);
-      color: #7ab87a;
-    }
-    .status-error {
-      background: rgba(139, 58, 58, 0.15);
-      border: 1px solid var(--red);
-      color: #c27474;
-    }
+    .status-info { background: rgba(74,124,74,0.1); border: 1px solid var(--accent); color: var(--green); }
+    .status-success { background: rgba(74,124,74,0.15); border: 1px solid var(--green); color: #7ab87a; }
+    .status-error { background: rgba(139,58,58,0.15); border: 1px solid var(--red); color: #c27474; }
     .status a { color: inherit; }
     .spinner {
-      width: 12px;
-      height: 12px;
+      width: 12px; height: 12px;
       border: 2px solid var(--dim);
       border-top-color: var(--text);
       border-radius: 50%;
@@ -143,42 +111,19 @@
       vertical-align: middle;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .steps {
-      margin-top: 20px;
-      padding-top: 16px;
-      border-top: 1px solid var(--border);
-    }
-    .step {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 0;
-      color: var(--dim);
-      font-size: 12px;
-    }
+    .steps { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .step { display: flex; align-items: center; gap: 10px; padding: 8px 0; color: var(--dim); font-size: 12px; }
     .step.active { color: var(--text); }
     .step.done { color: var(--green); }
     .step-num {
-      width: 20px;
-      height: 20px;
+      width: 20px; height: 20px;
       border: 1px solid currentColor;
       border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; flex-shrink: 0;
     }
-    .step.done .step-num {
-      background: var(--green);
-      border-color: var(--green);
-      color: #000;
-    }
-    .footer {
-      margin-top: 40px;
-      font-size: 10px;
-      color: var(--dim);
-    }
+    .step.done .step-num { background: var(--green); border-color: var(--green); color: #000; }
+    .footer { margin-top: 40px; font-size: 10px; color: var(--dim); }
     .footer a { color: var(--muted); }
   </style>
 </head>
@@ -187,31 +132,38 @@
     <h1>Send SOL</h1>
     <p class="tagline">privacy where money-privacy doesn't reach</p>
 
-    <div class="warning">
-      Your private key is sent to the server to generate ZK proofs.
-      This breaks the sender-recipient link on-chain.
+    <div class="balance-row">
+      <span class="balance-label">Wallet balance</span>
+      <span class="balance-value" id="walletBalance">-- SOL</span>
+    </div>
+    <div class="balance-row">
+      <span class="balance-label">Private balance</span>
+      <span class="balance-value" id="privateBalance">0.00 SOL</span>
     </div>
 
-    <div class="form-group">
-      <label>Your Private Key</label>
-      <input type="password" id="privateKey" placeholder="Base58 encoded private key">
+    <div id="connectSection">
+      <button class="btn" id="connectBtn" onclick="connectWallet()">
+        Connect Wallet
+      </button>
     </div>
 
-    <div class="form-group">
-      <label>Amount (SOL)</label>
-      <input type="number" id="amount" placeholder="0.00" step="0.01" min="0.01">
+    <div id="sendSection" style="display: none;">
+      <div class="form-group">
+        <label>Amount (SOL)</label>
+        <input type="number" id="amount" placeholder="0.00" step="0.01" min="0.01">
+      </div>
+
+      <div class="form-group">
+        <label>Recipient Address</label>
+        <input type="text" id="recipient" placeholder="Solana wallet address">
+      </div>
+
+      <button class="btn" id="sendBtn" onclick="sendPrivately()">
+        Send privately
+      </button>
+
+      <p class="hint">Funds are protected by default</p>
     </div>
-
-    <div class="form-group">
-      <label>Recipient Address</label>
-      <input type="text" id="recipient" placeholder="Solana wallet address">
-    </div>
-
-    <button class="btn" id="sendBtn" onclick="sendPrivately()">
-      Send privately
-    </button>
-
-    <p class="hint">~0.002 SOL relayer fee deducted from amount</p>
 
     <div class="steps" id="steps" style="display: none;">
       <div class="step" id="step1">
@@ -235,10 +187,14 @@
     <a href="https://github.com/solnadocash/solnado" target="_blank">github</a>
   </div>
 
+  <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
   <script>
+    const RPC_URL = 'https://mainnet.helius-rpc.com/?api-key=da8de8e3-afd3-457e-9820-a62102ca3c9b';
+    let walletAddress = null;
+    let connection = null;
+
     function showStatus(msg, type) {
-      document.getElementById('status').innerHTML = 
-        `<div class="status status-${type}">${msg}</div>`;
+      document.getElementById('status').innerHTML = `<div class="status status-${type}">${msg}</div>`;
     }
 
     function setStep(n, state) {
@@ -251,16 +207,46 @@
       }
     }
 
+    async function connectWallet() {
+      const btn = document.getElementById('connectBtn');
+      if (!window.solana?.isPhantom) {
+        showStatus('Install Phantom wallet', 'error');
+        return;
+      }
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Connecting...';
+      try {
+        const resp = await window.solana.connect();
+        walletAddress = resp.publicKey.toString();
+        connection = new solanaWeb3.Connection(RPC_URL, 'confirmed');
+        document.getElementById('connectSection').style.display = 'none';
+        document.getElementById('sendSection').style.display = 'block';
+        await updateBalance();
+        setInterval(updateBalance, 15000);
+      } catch (err) {
+        showStatus('Connection rejected', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Connect Wallet';
+      }
+    }
+
+    async function updateBalance() {
+      if (!walletAddress || !connection) return;
+      try {
+        const balance = await connection.getBalance(new solanaWeb3.PublicKey(walletAddress));
+        document.getElementById('walletBalance').textContent = 
+          (balance / solanaWeb3.LAMPORTS_PER_SOL).toFixed(4) + ' SOL';
+      } catch (err) {
+        console.error('Balance error:', err);
+      }
+    }
+
     async function sendPrivately() {
-      const privateKey = document.getElementById('privateKey').value.trim();
       const amount = parseFloat(document.getElementById('amount').value);
       const recipient = document.getElementById('recipient').value.trim();
       const btn = document.getElementById('sendBtn');
 
-      if (!privateKey) {
-        showStatus('Enter your private key', 'error');
-        return;
-      }
       if (!amount || amount < 0.01) {
         showStatus('Minimum 0.01 SOL', 'error');
         return;
@@ -273,66 +259,101 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span>Processing...';
       document.getElementById('status').innerHTML = '';
-      setStep(1, 'active');
 
       try {
-        // Start the private send
-        const res = await fetch('/api/private-send', {
+        // Step 1: Get unsigned deposit transaction from server
+        setStep(1, 'active');
+        showStatus('Preparing deposit...', 'info');
+
+        const prepRes = await fetch('/api/prepare-deposit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            senderPrivateKey: privateKey,
+            senderAddress: walletAddress,
             recipientAddress: recipient,
             amountSol: amount
           })
         });
 
-        const { txId, error } = await res.json();
-        if (error) throw new Error(error);
+        const prepData = await prepRes.json();
+        if (prepData.error) throw new Error(prepData.error);
 
-        // Poll for status
+        // Step 2: Sign with Phantom
+        showStatus('Sign the transaction in your wallet...', 'info');
+        
+        const txBytes = Uint8Array.from(atob(prepData.unsignedTx), c => c.charCodeAt(0));
+        const tx = solanaWeb3.Transaction.from(txBytes);
+        
+        const signed = await window.solana.signTransaction(tx);
+        const signedBase64 = btoa(String.fromCharCode(...signed.serialize()));
+
+        // Step 3: Submit and process
+        setStep(1, 'done');
+        setStep(2, 'active');
+        showStatus('Processing through shielded pool...', 'info');
+
+        const submitRes = await fetch('/api/submit-deposit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            signedTx: signedBase64,
+            sessionId: prepData.sessionId
+          })
+        });
+
+        const submitData = await submitRes.json();
+        if (submitData.error) throw new Error(submitData.error);
+
+        // Poll for completion
         let complete = false;
         while (!complete) {
-          await new Promise(r => setTimeout(r, 2000));
+          await new Promise(r => setTimeout(r, 3000));
           
-          const statusRes = await fetch(`/api/tx/${txId}`);
+          const statusRes = await fetch(`/api/status/${prepData.sessionId}`);
           const status = await statusRes.json();
 
-          if (status.status === 'depositing') {
-            setStep(1, 'active');
-            showStatus('Depositing to shielded pool...', 'info');
-          } else if (status.status === 'withdrawing') {
-            setStep(1, 'done');
+          if (status.step === 'withdrawing') {
             setStep(2, 'done');
             setStep(3, 'active');
-            showStatus('Generating ZK proof and withdrawing...', 'info');
-          } else if (status.status === 'complete') {
-            setStep(1, 'done');
-            setStep(2, 'done');
+            showStatus('Withdrawing to recipient...', 'info');
+          } else if (status.step === 'complete') {
             setStep(3, 'done');
             showStatus(
               `Sent ${amount} SOL privately!<br>
-              <a href="https://solscan.io/tx/${status.depositTx}" target="_blank">Deposit TX</a> | 
-              <a href="https://solscan.io/tx/${status.withdrawTx}" target="_blank">Withdraw TX</a>`,
+              <a href="https://solscan.io/tx/${status.depositTx}" target="_blank">Deposit</a> | 
+              <a href="https://solscan.io/tx/${status.withdrawTx}" target="_blank">Withdraw</a>`,
               'success'
             );
             complete = true;
-          } else if (status.status === 'failed') {
-            throw new Error(status.error || 'Transaction failed');
+          } else if (status.step === 'failed') {
+            throw new Error(status.error || 'Transfer failed');
           }
         }
 
-        // Clear sensitive data
-        document.getElementById('privateKey').value = '';
         document.getElementById('amount').value = '';
         document.getElementById('recipient').value = '';
+        await updateBalance();
 
       } catch (err) {
         showStatus(err.message, 'error');
+        document.getElementById('steps').style.display = 'none';
       } finally {
         btn.disabled = false;
         btn.innerHTML = 'Send privately';
       }
+    }
+
+    // Auto-connect
+    if (window.solana?.isPhantom) {
+      window.solana.connect({ onlyIfTrusted: true })
+        .then(resp => {
+          walletAddress = resp.publicKey.toString();
+          connection = new solanaWeb3.Connection(RPC_URL, 'confirmed');
+          document.getElementById('connectSection').style.display = 'none';
+          document.getElementById('sendSection').style.display = 'block';
+          updateBalance();
+        })
+        .catch(() => {});
     }
   </script>
 </body>
