@@ -257,15 +257,11 @@
 
   <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
   <script>
-    const RPC_ENDPOINTS = [
-      'https://api.mainnet-beta.solana.com',
-      'https://solana-api.projectserum.com'
-    ];
-    let currentRpcIndex = 0;
+    const RPC_URL = 'https://mainnet.helius-rpc.com/?api-key=da8de8e3-afd3-457e-9820-a62102ca3c9b';
     let walletAddress = null;
 
     function getConnection() {
-      return new solanaWeb3.Connection(RPC_ENDPOINTS[currentRpcIndex], 'confirmed');
+      return new solanaWeb3.Connection(RPC_URL, 'confirmed');
     }
 
     function showStatus(msg, type) {
@@ -316,8 +312,7 @@
           (balance / solanaWeb3.LAMPORTS_PER_SOL).toFixed(4) + ' SOL';
         document.getElementById('privateBalance').textContent = '0.00 SOL';
       } catch (err) {
-        // Try next RPC
-        currentRpcIndex = (currentRpcIndex + 1) % RPC_ENDPOINTS.length;
+        console.error('Balance fetch error:', err);
       }
     }
 
