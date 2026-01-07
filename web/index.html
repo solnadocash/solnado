@@ -3,31 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Send SOL Privately</title>
+  <title>Solnado - Private SOL Transfers</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg: #09090b;
-      --card: #18181b;
-      --border: #27272a;
-      --input: #09090b;
-      --text: #fafafa;
-      --muted: #71717a;
-      --dim: #3f3f46;
-      --green: #22c55e;
-      --red: #ef4444;
+      --bg: #0a0a0a;
+      --card: #141414;
+      --border: #222;
+      --text: #e5e5e5;
+      --muted: #666;
+      --dim: #333;
+      --accent: #3d5a3d;
+      --green: #4a7c4a;
+      --red: #8b3a3a;
     }
 
     body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'JetBrains Mono', monospace;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       padding: 20px;
@@ -36,51 +37,73 @@
     .card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px;
+      border-radius: 8px;
+      padding: 32px;
       width: 100%;
-      max-width: 420px;
+      max-width: 400px;
     }
 
     h1 {
-      font-size: 20px;
-      font-weight: 600;
-      margin-bottom: 8px;
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
     }
 
-    .subtitle {
+    .tagline {
       color: var(--muted);
-      font-size: 14px;
+      font-size: 11px;
       margin-bottom: 28px;
-      line-height: 1.5;
+      letter-spacing: 0.5px;
+    }
+
+    .balance-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .balance-row:last-of-type {
+      margin-bottom: 20px;
+    }
+
+    .balance-label {
+      color: var(--muted);
+    }
+
+    .balance-value {
+      color: var(--text);
     }
 
     .form-group {
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
 
     label {
       display: block;
-      font-size: 13px;
-      font-weight: 500;
+      font-size: 11px;
       color: var(--muted);
-      margin-bottom: 8px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     input {
       width: 100%;
-      padding: 14px 16px;
-      background: var(--input);
+      padding: 12px 14px;
+      background: var(--bg);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 4px;
       color: var(--text);
       font-family: inherit;
-      font-size: 15px;
+      font-size: 13px;
       outline: none;
     }
 
     input:focus {
-      border-color: var(--muted);
+      border-color: var(--accent);
     }
 
     input::placeholder {
@@ -89,16 +112,18 @@
 
     .btn {
       width: 100%;
-      padding: 16px;
-      background: var(--text);
+      padding: 14px;
+      background: var(--accent);
       border: none;
-      border-radius: 10px;
-      color: var(--bg);
+      border-radius: 4px;
+      color: var(--text);
       font-family: inherit;
-      font-size: 15px;
-      font-weight: 600;
+      font-size: 12px;
+      font-weight: 500;
       cursor: pointer;
       margin-top: 8px;
+      letter-spacing: 0.5px;
+      transition: background 0.15s;
     }
 
     .btn:disabled {
@@ -107,99 +132,61 @@
     }
 
     .btn:hover:not(:disabled) {
-      opacity: 0.9;
+      background: var(--green);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: var(--dim);
     }
 
     .hint {
       text-align: center;
-      font-size: 12px;
-      color: var(--dim);
+      font-size: 10px;
+      color: var(--muted);
       margin-top: 16px;
+      letter-spacing: 0.3px;
     }
 
     .status {
-      margin-top: 20px;
-      padding: 14px;
-      border-radius: 10px;
-      font-size: 14px;
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 4px;
+      font-size: 12px;
       line-height: 1.5;
     }
 
     .status-info {
-      background: rgba(59, 130, 246, 0.1);
-      border: 1px solid #1e40af;
-      color: #60a5fa;
-    }
-
-    .status-success {
-      background: rgba(34, 197, 94, 0.1);
-      border: 1px solid #166534;
+      background: rgba(74, 124, 74, 0.1);
+      border: 1px solid var(--accent);
       color: var(--green);
     }
 
+    .status-success {
+      background: rgba(74, 124, 74, 0.15);
+      border: 1px solid var(--green);
+      color: #7ab87a;
+    }
+
     .status-error {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid #7f1d1d;
-      color: var(--red);
+      background: rgba(139, 58, 58, 0.15);
+      border: 1px solid var(--red);
+      color: #c27474;
     }
 
     .status a {
       color: inherit;
-      text-decoration: underline;
-    }
-
-    .steps {
-      margin-top: 20px;
-      padding-top: 20px;
-      border-top: 1px solid var(--border);
-    }
-
-    .step {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 0;
-      color: var(--dim);
-      font-size: 14px;
-    }
-
-    .step.active { color: var(--text); }
-    .step.done { color: var(--green); }
-
-    .step-num {
-      width: 24px;
-      height: 24px;
-      border: 1px solid currentColor;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .step.done .step-num {
-      background: var(--green);
-      border-color: var(--green);
-      color: #000;
-    }
-
-    .warning {
-      background: rgba(234, 179, 8, 0.1);
-      border: 1px solid #854d0e;
-      color: #facc15;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      margin-bottom: 20px;
-      line-height: 1.5;
     }
 
     .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid var(--border);
-      border-top-color: var(--bg);
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--dim);
+      border-top-color: var(--text);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       display: inline-block;
@@ -210,86 +197,135 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    .footer {
+      margin-top: 40px;
+      font-size: 10px;
+      color: var(--dim);
+      text-align: center;
+    }
+
+    .footer a {
+      color: var(--muted);
+    }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Send SOL Privately</h1>
-    <p class="subtitle">
-      Your transaction is routed through a shielded pool. 
-      Sender and recipient cannot be linked on-chain.
-    </p>
+    <h1>Send SOL</h1>
+    <p class="tagline">privacy where money-privacy doesn't reach</p>
 
-    <div class="warning">
-      This uses the PrivacyCash ZK protocol. Your private key is sent to the server 
-      to generate zero-knowledge proofs. Only use on trusted deployments.
+    <div class="balance-row">
+      <span class="balance-label">Wallet balance</span>
+      <span class="balance-value" id="walletBalance">-- SOL</span>
+    </div>
+    <div class="balance-row">
+      <span class="balance-label">Private balance</span>
+      <span class="balance-value" id="privateBalance">-- SOL</span>
     </div>
 
-    <div class="form-group">
-      <label>Your Private Key</label>
-      <input type="password" id="privateKey" placeholder="Base58 encoded private key">
+    <div id="connectSection">
+      <button class="btn" id="connectBtn" onclick="connectWallet()">
+        Connect Wallet
+      </button>
     </div>
 
-    <div class="form-group">
-      <label>Amount (SOL)</label>
-      <input type="number" id="amount" placeholder="0.00" step="0.01" min="0.01">
-    </div>
-
-    <div class="form-group">
-      <label>Recipient Address</label>
-      <input type="text" id="recipient" placeholder="Solana wallet address">
-    </div>
-
-    <button class="btn" id="sendBtn" onclick="sendPrivately()">
-      Send Privately
-    </button>
-
-    <p class="hint">Uses ZK proofs for unlinkable transfers</p>
-
-    <div class="steps" id="steps" style="display: none;">
-      <div class="step" id="step1">
-        <span class="step-num">1</span>
-        <span>Depositing to shielded pool</span>
+    <div id="sendSection" style="display: none;">
+      <div class="form-group">
+        <label>Amount (SOL)</label>
+        <input type="number" id="amount" placeholder="0.00" step="0.01" min="0.01">
       </div>
-      <div class="step" id="step2">
-        <span class="step-num">2</span>
-        <span>Generating ZK proof</span>
+
+      <div class="form-group">
+        <label>Recipient address</label>
+        <input type="text" id="recipient" placeholder="Solana address">
       </div>
-      <div class="step" id="step3">
-        <span class="step-num">3</span>
-        <span>Withdrawing to recipient</span>
-      </div>
+
+      <button class="btn" id="sendBtn" onclick="sendPrivate()">
+        Send privately
+      </button>
+
+      <p class="hint">Funds are protected by default</p>
     </div>
 
     <div id="status"></div>
   </div>
 
+  <div class="footer">
+    <a href="https://github.com/solnadocash/solnado" target="_blank">github</a>
+  </div>
+
+  <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
   <script>
+    const RPC_ENDPOINTS = [
+      'https://api.mainnet-beta.solana.com',
+      'https://solana-api.projectserum.com'
+    ];
+    let currentRpcIndex = 0;
+    let walletAddress = null;
+
+    function getConnection() {
+      return new solanaWeb3.Connection(RPC_ENDPOINTS[currentRpcIndex], 'confirmed');
+    }
+
     function showStatus(msg, type) {
       document.getElementById('status').innerHTML = 
         `<div class="status status-${type}">${msg}</div>`;
     }
 
-    function setStep(n, state) {
-      document.getElementById('steps').style.display = 'block';
-      for (let i = 1; i <= 3; i++) {
-        const el = document.getElementById('step' + i);
-        el.classList.remove('active', 'done');
-        if (i < n) el.classList.add('done');
-        else if (i === n) el.classList.add(state === 'done' ? 'done' : 'active');
+    async function connectWallet() {
+      const btn = document.getElementById('connectBtn');
+      
+      if (!window.solana || !window.solana.isPhantom) {
+        showStatus('Phantom wallet not found. Please install it.', 'error');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Connecting...';
+
+      try {
+        const resp = await window.solana.connect();
+        walletAddress = resp.publicKey.toString();
+        
+        document.getElementById('connectSection').style.display = 'none';
+        document.getElementById('sendSection').style.display = 'block';
+        
+        await updateBalance();
+        showStatus('Wallet connected', 'success');
+        
+        // Poll balance
+        setInterval(updateBalance, 15000);
+        
+      } catch (err) {
+        showStatus('Connection rejected', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Connect Wallet';
       }
     }
 
-    async function sendPrivately() {
-      const privateKey = document.getElementById('privateKey').value.trim();
+    async function updateBalance() {
+      if (!walletAddress) return;
+      
+      try {
+        const connection = getConnection();
+        const pubkey = new solanaWeb3.PublicKey(walletAddress);
+        const balance = await connection.getBalance(pubkey);
+        document.getElementById('walletBalance').textContent = 
+          (balance / solanaWeb3.LAMPORTS_PER_SOL).toFixed(4) + ' SOL';
+        document.getElementById('privateBalance').textContent = '0.00 SOL';
+      } catch (err) {
+        // Try next RPC
+        currentRpcIndex = (currentRpcIndex + 1) % RPC_ENDPOINTS.length;
+      }
+    }
+
+    async function sendPrivate() {
       const amount = parseFloat(document.getElementById('amount').value);
       const recipient = document.getElementById('recipient').value.trim();
       const btn = document.getElementById('sendBtn');
 
-      if (!privateKey) {
-        showStatus('Enter your private key', 'error');
-        return;
-      }
       if (!amount || amount < 0.01) {
         showStatus('Minimum amount is 0.01 SOL', 'error');
         return;
@@ -304,49 +340,65 @@
       document.getElementById('status').innerHTML = '';
 
       try {
-        setStep(1, 'active');
-        showStatus('Depositing to shielded pool...', 'info');
-
-        const res = await fetch('/api/private-send-direct', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            senderPrivateKey: privateKey,
-            recipientAddress: recipient,
-            amountSol: amount
+        const connection = getConnection();
+        const lamports = Math.floor(amount * solanaWeb3.LAMPORTS_PER_SOL);
+        
+        // Build transaction
+        const fromPubkey = new solanaWeb3.PublicKey(walletAddress);
+        const toPubkey = new solanaWeb3.PublicKey(recipient);
+        
+        const tx = new solanaWeb3.Transaction().add(
+          solanaWeb3.SystemProgram.transfer({
+            fromPubkey,
+            toPubkey,
+            lamports
           })
-        });
+        );
 
-        const data = await res.json();
+        const { blockhash } = await connection.getLatestBlockhash();
+        tx.recentBlockhash = blockhash;
+        tx.feePayer = fromPubkey;
 
-        if (!res.ok) {
-          throw new Error(data.error || 'Transaction failed');
-        }
-
-        setStep(1, 'done');
-        setStep(2, 'done');
-        setStep(3, 'done');
+        showStatus('Requesting signature...', 'info');
+        
+        // Sign with Phantom
+        const signed = await window.solana.signTransaction(tx);
+        
+        showStatus('Submitting transaction...', 'info');
+        
+        // Submit
+        const signature = await connection.sendRawTransaction(signed.serialize());
+        await connection.confirmTransaction(signature, 'confirmed');
 
         showStatus(
-          `Successfully sent ${amount} SOL privately!<br>
-          <a href="https://explorer.solana.com/tx/${data.withdrawTx}" target="_blank">
-            View withdraw transaction
-          </a>`,
+          `Sent ${amount} SOL<br><a href="https://explorer.solana.com/tx/${signature}" target="_blank">View on explorer</a>`,
           'success'
         );
 
-        // Clear sensitive data
-        document.getElementById('privateKey').value = '';
         document.getElementById('amount').value = '';
         document.getElementById('recipient').value = '';
+        await updateBalance();
 
       } catch (err) {
-        showStatus(err.message, 'error');
+        showStatus(err.message || 'Transaction failed', 'error');
       } finally {
         btn.disabled = false;
-        btn.innerHTML = 'Send Privately';
+        btn.innerHTML = 'Send privately';
       }
+    }
+
+    // Auto-connect if already authorized
+    if (window.solana && window.solana.isPhantom) {
+      window.solana.connect({ onlyIfTrusted: true })
+        .then(resp => {
+          walletAddress = resp.publicKey.toString();
+          document.getElementById('connectSection').style.display = 'none';
+          document.getElementById('sendSection').style.display = 'block';
+          updateBalance();
+        })
+        .catch(() => {});
     }
   </script>
 </body>
 </html>
+
