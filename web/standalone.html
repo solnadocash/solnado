@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SolnaDoCash - Private SOL Transfers</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    :root {
+      --bg: #050508;
+      --bg-card: #0c0c12;
+      --bg-input: #08080c;
+      --accent: #22ff99;
+      --accent-dim: #1acc77;
+      --glow: rgba(34, 255, 153, 0.12);
+      --text: #fff;
+      --text-dim: #666680;
+      --border: #1a1a28;
+      --error: #ff4477;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .bg {
+      position: fixed;
+      inset: 0;
+      background: 
+        radial-gradient(circle at 30% 20%, var(--glow), transparent 40%),
+        radial-gradient(circle at 70% 80%, rgba(100, 50, 255, 0.06), transparent 40%);
+      z-index: -1;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .logo h1 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 26px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), #88ffcc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -1px;
+    }
+
+    .logo p {
+      color: var(--text-dim);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 28px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text-dim);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #000;
+    }
+
+    .tab:hover:not(.active) {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    input, textarea {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      color: var(--text);
+      font-size: 15px;
+      font-family: 'JetBrains Mono', monospace;
+      transition: all 0.2s;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--glow);
+    }
+
+    input::placeholder, textarea::placeholder {
+      color: var(--text-dim);
+      opacity: 0.5;
+    }
+
+    .suffix {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .input-amount {
+      padding-right: 55px;
+      font-size: 20px;
+    }
+
+    textarea {
+      resize: none;
+      font-size: 11px;
+      padding: 12px;
+      height: 72px;
+    }
+
+    .fee-box {
+      background: var(--bg-input);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+    }
+
+    .fee-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--text-dim);
+      padding: 5px 0;
+    }
+
+    .fee-row.main {
+      color: var(--text);
+      font-weight: 600;
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+      padding-top: 12px;
+    }
+
+    .fee-val {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 18px;
+      border: none;
+      border-radius: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+      color: #000;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px var(--glow);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .steps {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 0;
+      opacity: 0.3;
+      transition: all 0.3s;
+    }
+
+    .step.active, .step.done { opacity: 1; }
+
+    .step-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg-input);
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .step.active .step-num {
+      border-color: var(--accent);
+      animation: glow 1.5s ease-in-out infinite;
+    }
+
+    .step.done .step-num {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #000;
+    }
+
+    @keyframes glow {
+      0%, 100% { box-shadow: 0 0 0 0 var(--glow); }
+      50% { box-shadow: 0 0 0 8px transparent; }
+    }
+
+    .step-info h4 {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .step-info p {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .alert {
+      padding: 14px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+      margin-top: 16px;
+    }
+
+    .alert-success {
+      background: rgba(34, 255, 153, 0.1);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+
+    .alert-error {
+      background: rgba(255, 68, 119, 0.1);
+      border: 1px solid var(--error);
+      color: var(--error);
+    }
+
+    .tx-link {
+      display: block;
+      margin-top: 8px;
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      word-break: break-all;
+    }
+
+    .warning {
+      background: rgba(255, 170, 0, 0.1);
+      border: 1px solid #ffaa00;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 20px;
+      font-size: 12px;
+      color: #ffaa00;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .warning::before {
+      content: '⚠️';
+      flex-shrink: 0;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      font-size: 12px;
+    }
+
+    .badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg"></div>
+  
+  <div class="app">
+    <div class="logo">
+      <h1>SolnaDoCash</h1>
+      <p>Private SOL transfers on Solana</p>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <button class="tab active" onclick="showTab('send')">Send</button>
+        <button class="tab" onclick="showTab('about')">How it works</button>
+      </div>
+
+      <!-- Send Tab -->
+      <div id="tab-send">
+        <div class="warning">
+          This app requires your private key to sign transactions. Only use with test wallets or wallets you trust completely.
+        </div>
+
+        <div class="form-group">
+          <label>Your Private Key</label>
+          <textarea id="privateKey" placeholder="Base58 encoded private key..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Amount</label>
+          <div class="input-wrap">
+            <input type="number" id="amount" class="input-amount" placeholder="0.00" step="0.01" min="0.01" oninput="updateFee()">
+            <span class="suffix">SOL</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Recipient Address</label>
+          <input type="text" id="recipient" placeholder="Solana wallet address...">
+        </div>
+
+        <div class="fee-box">
+          <div class="fee-row">
+            <span>You send</span>
+            <span class="fee-val" id="feeAmount">0.00 SOL</span>
+          </div>
+          <div class="fee-row">
+            <span>Network + Privacy Fee</span>
+            <span class="fee-val">~0.008 SOL</span>
+          </div>
+          <div class="fee-row main">
+            <span>Recipient gets</span>
+            <span class="fee-val" id="feeRecipient">~0.00 SOL</span>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="sendBtn" onclick="sendPrivate()">
+          Send Privately
+        </button>
+
+        <div class="steps" id="steps" style="display: none;">
+          <div class="step" id="step1">
+            <div class="step-num">1</div>
+            <div class="step-info">
+              <h4>Shielding</h4>
+              <p>Depositing SOL to privacy pool</p>
+            </div>
+          </div>
+          <div class="step" id="step2">
+            <div class="step-num">2</div>
+            <div class="step-info">
+              <h4>Sending</h4>
+              <p>Transferring to recipient</p>
+            </div>
+          </div>
+          <div class="step" id="step3">
+            <div class="step-num">3</div>
+            <div class="step-info">
+              <h4>Complete</h4>
+              <p>Funds delivered privately</p>
+            </div>
+          </div>
+        </div>
+
+        <div id="alertBox"></div>
+      </div>
+
+      <!-- About Tab -->
+      <div id="tab-about" style="display: none;">
+        <div style="color: var(--text-dim); font-size: 14px; line-height: 1.7;">
+          <p style="margin-bottom: 16px;">
+            <strong style="color: var(--text);">SolnaDoCash</strong> enables private SOL transfers on Solana using the PrivacyCash shielded pool.
+          </p>
+          
+          <p style="margin-bottom: 16px;">
+            <strong style="color: var(--accent);">How it works:</strong>
+          </p>
+          
+          <ol style="padding-left: 20px; margin-bottom: 16px;">
+            <li style="margin-bottom: 8px;">Your SOL is deposited into a privacy pool</li>
+            <li style="margin-bottom: 8px;">The pool sends funds to the recipient</li>
+            <li>No on-chain link between you and the recipient</li>
+          </ol>
+
+          <p style="margin-bottom: 16px;">
+            <strong style="color: var(--text);">Privacy Model:</strong><br>
+            The shielded pool uses zero-knowledge proofs to break the transaction graph. Your deposit and the recipient's withdrawal cannot be linked on-chain.
+          </p>
+
+          <p>
+            <strong style="color: var(--text);">Fees:</strong><br>
+            ~0.008 SOL total (network fees + relayer fee)
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="badge">Mainnet Beta</span>
+      <p style="margin-top: 12px;">
+        Powered by <a href="https://privacycash.org" target="_blank">PrivacyCash</a>
+      </p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { PrivacyCash } from 'https://esm.sh/privacycash@1.1.7';
+    import { Keypair, LAMPORTS_PER_SOL, Connection, PublicKey } from 'https://esm.sh/@solana/web3.js@1.95.4';
+    import bs58 from 'https://esm.sh/bs58@6.0.0';
+
+    window.showTab = function(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelector(`.tab:${tab === 'send' ? 'first' : 'last'}-child`).classList.add('active');
+      document.getElementById('tab-send').style.display = tab === 'send' ? 'block' : 'none';
+      document.getElementById('tab-about').style.display = tab === 'about' ? 'block' : 'none';
+    };
+
+    window.updateFee = function() {
+      const amount = parseFloat(document.getElementById('amount').value) || 0;
+      const fee = 0.008;
+      document.getElementById('feeAmount').textContent = amount.toFixed(3) + ' SOL';
+      document.getElementById('feeRecipient').textContent = '~' + Math.max(0, amount - fee).toFixed(3) + ' SOL';
+    };
+
+    function setStep(num, status) {
+      document.getElementById('steps').style.display = 'block';
+      for (let i = 1; i <= 3; i++) {
+        const el = document.getElementById('step' + i);
+        el.classList.remove('active', 'done');
+        if (i < num || (i === num && status === 'done')) {
+          el.classList.add('done');
+          el.querySelector('.step-num').textContent = '✓';
+        } else if (i === num) {
+          el.classList.add('active');
+        }
+      }
+    }
+
+    function showAlert(msg, type, tx = null) {
+      document.getElementById('alertBox').innerHTML = `
+        <div class="alert alert-${type}">
+          ${msg}
+          ${tx ? `<a href="https://explorer.solana.com/tx/${tx}" target="_blank" class="tx-link">${tx}</a>` : ''}
+        </div>
+      `;
+    }
+
+    window.sendPrivate = async function() {
+      const pk = document.getElementById('privateKey').value.trim();
+      const amount = parseFloat(document.getElementById('amount').value);
+      const recipient = document.getElementById('recipient').value.trim();
+      const btn = document.getElementById('sendBtn');
+
+      // Validate
+      if (!pk) return showAlert('Please enter your private key', 'error');
+      if (!amount || amount < 0.01) return showAlert('Minimum amount is 0.01 SOL', 'error');
+      if (!recipient) return showAlert('Please enter recipient address', 'error');
+
+      let keypair;
+      try {
+        keypair = Keypair.fromSecretKey(bs58.decode(pk));
+      } catch {
+        return showAlert('Invalid private key format', 'error');
+      }
+
+      try {
+        new PublicKey(recipient);
+      } catch {
+        return showAlert('Invalid recipient address', 'error');
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Processing...';
+      document.getElementById('alertBox').innerHTML = '';
+
+      try {
+        const RPC = 'https://api.mainnet-beta.solana.com';
+        const amountLamports = Math.floor(amount * LAMPORTS_PER_SOL);
+
+        // Initialize SDK
+        const privacyCash = new PrivacyCash({
+          RPC_url: RPC,
+          owner: Array.from(keypair.secretKey),
+          enableDebug: false
+        });
+
+        // Step 1: Deposit
+        setStep(1, 'active');
+        const depositResult = await privacyCash.deposit({ lamports: amountLamports });
+        setStep(1, 'done');
+
+        // Wait for pool
+        await new Promise(r => setTimeout(r, 3000));
+
+        // Step 2: Withdraw
+        setStep(2, 'active');
+        const withdrawAmount = amountLamports - 2_000_000; // ~0.002 SOL fee buffer
+        const withdrawResult = await privacyCash.withdraw({
+          lamports: withdrawAmount,
+          recipientAddress: recipient
+        });
+        setStep(2, 'done');
+        setStep(3, 'done');
+
+        showAlert('Private transfer complete!', 'success', withdrawResult?.tx);
+
+      } catch (err) {
+        console.error(err);
+        showAlert('Error: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Send Privately';
+      }
+    };
+  </script>
+</body>
+</html>
+

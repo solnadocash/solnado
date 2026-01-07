@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Send SOL Privately</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #09090b;
+      --card: #18181b;
+      --border: #27272a;
+      --input: #09090b;
+      --text: #fafafa;
+      --muted: #71717a;
+      --dim: #3f3f46;
+      --green: #22c55e;
+      --red: #ef4444;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px 16px;
+      background: var(--input);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 15px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--muted);
+    }
+
+    input::placeholder {
+      color: var(--dim);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 16px;
+      background: var(--text);
+      border: none;
+      border-radius: 10px;
+      color: var(--bg);
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    .hint {
+      text-align: center;
+      font-size: 12px;
+      color: var(--dim);
+      margin-top: 16px;
+    }
+
+    .status {
+      margin-top: 20px;
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .status-info {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid #1e40af;
+      color: #60a5fa;
+    }
+
+    .status-success {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid #166534;
+      color: var(--green);
+    }
+
+    .status-error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid #7f1d1d;
+      color: var(--red);
+    }
+
+    .status a {
+      color: inherit;
+      text-decoration: underline;
+    }
+
+    .steps {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      color: var(--dim);
+      font-size: 14px;
+    }
+
+    .step.active { color: var(--text); }
+    .step.done { color: var(--green); }
+
+    .step-num {
+      width: 24px;
+      height: 24px;
+      border: 1px solid currentColor;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .step.done .step-num {
+      background: var(--green);
+      border-color: var(--green);
+      color: #000;
+    }
+
+    .warning {
+      background: rgba(234, 179, 8, 0.1);
+      border: 1px solid #854d0e;
+      color: #facc15;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--bg);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Send SOL Privately</h1>
+    <p class="subtitle">
+      Your transaction is routed through a shielded pool. 
+      Sender and recipient cannot be linked on-chain.
+    </p>
+
+    <div class="warning">
+      This uses the PrivacyCash ZK protocol. Your private key is sent to the server 
+      to generate zero-knowledge proofs. Only use on trusted deployments.
+    </div>
+
+    <div class="form-group">
+      <label>Your Private Key</label>
+      <input type="password" id="privateKey" placeholder="Base58 encoded private key">
+    </div>
+
+    <div class="form-group">
+      <label>Amount (SOL)</label>
+      <input type="number" id="amount" placeholder="0.00" step="0.01" min="0.01">
+    </div>
+
+    <div class="form-group">
+      <label>Recipient Address</label>
+      <input type="text" id="recipient" placeholder="Solana wallet address">
+    </div>
+
+    <button class="btn" id="sendBtn" onclick="sendPrivately()">
+      Send Privately
+    </button>
+
+    <p class="hint">Uses ZK proofs for unlinkable transfers</p>
+
+    <div class="steps" id="steps" style="display: none;">
+      <div class="step" id="step1">
+        <span class="step-num">1</span>
+        <span>Depositing to shielded pool</span>
+      </div>
+      <div class="step" id="step2">
+        <span class="step-num">2</span>
+        <span>Generating ZK proof</span>
+      </div>
+      <div class="step" id="step3">
+        <span class="step-num">3</span>
+        <span>Withdrawing to recipient</span>
+      </div>
+    </div>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    function showStatus(msg, type) {
+      document.getElementById('status').innerHTML = 
+        `<div class="status status-${type}">${msg}</div>`;
+    }
+
+    function setStep(n, state) {
+      document.getElementById('steps').style.display = 'block';
+      for (let i = 1; i <= 3; i++) {
+        const el = document.getElementById('step' + i);
+        el.classList.remove('active', 'done');
+        if (i < n) el.classList.add('done');
+        else if (i === n) el.classList.add(state === 'done' ? 'done' : 'active');
+      }
+    }
+
+    async function sendPrivately() {
+      const privateKey = document.getElementById('privateKey').value.trim();
+      const amount = parseFloat(document.getElementById('amount').value);
+      const recipient = document.getElementById('recipient').value.trim();
+      const btn = document.getElementById('sendBtn');
+
+      if (!privateKey) {
+        showStatus('Enter your private key', 'error');
+        return;
+      }
+      if (!amount || amount < 0.01) {
+        showStatus('Minimum amount is 0.01 SOL', 'error');
+        return;
+      }
+      if (!recipient || recipient.length < 32) {
+        showStatus('Enter a valid recipient address', 'error');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Processing...';
+      document.getElementById('status').innerHTML = '';
+
+      try {
+        setStep(1, 'active');
+        showStatus('Depositing to shielded pool...', 'info');
+
+        const res = await fetch('/api/private-send-direct', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            senderPrivateKey: privateKey,
+            recipientAddress: recipient,
+            amountSol: amount
+          })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Transaction failed');
+        }
+
+        setStep(1, 'done');
+        setStep(2, 'done');
+        setStep(3, 'done');
+
+        showStatus(
+          `Successfully sent ${amount} SOL privately!<br>
+          <a href="https://explorer.solana.com/tx/${data.withdrawTx}" target="_blank">
+            View withdraw transaction
+          </a>`,
+          'success'
+        );
+
+        // Clear sensitive data
+        document.getElementById('privateKey').value = '';
+        document.getElementById('amount').value = '';
+        document.getElementById('recipient').value = '';
+
+      } catch (err) {
+        showStatus(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Send Privately';
+      }
+    }
+  </script>
+</body>
+</html>
