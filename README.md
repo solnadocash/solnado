@@ -1,4 +1,4 @@
-# Solnado
+# Solnado Cash
 
 Private SOL transfers on Solana.
 
