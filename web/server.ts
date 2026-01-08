@@ -273,20 +273,43 @@ app.post('/api/submit-deposit', async (req, res) => {
     });
     console.log(`[${sessionId}] Pool deposit TX: ${depositResult?.tx || 'done'}`);
 
-    // Wait for pool state to update
-    await new Promise(r => setTimeout(r, 5000));
+    // Wait for pool state to update (longer wait to let Merkle tree settle)
+    await new Promise(r => setTimeout(r, 8000));
 
-    // Step 3: Withdraw from pool to recipient
+    // Step 3: Withdraw from pool to recipient (with retry logic)
     session.step = 'withdrawing';
     console.log(`[${sessionId}] Withdrawing to recipient...`);
     
     const fee = 5_000_000; // 0.005 SOL relayer fee
     const withdrawAmount = session.amountLamports - fee;
 
-    const withdrawResult = await privacyCash.withdraw({
-      lamports: withdrawAmount,
-      recipientAddress: session.recipientAddress
-    });
+    let withdrawResult: any = null;
+    let lastError: any = null;
+    const maxRetries = 3;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[${sessionId}] Withdraw attempt ${attempt}/${maxRetries}...`);
+        withdrawResult = await privacyCash.withdraw({
+          lamports: withdrawAmount,
+          recipientAddress: session.recipientAddress
+        });
+        break; // Success, exit loop
+      } catch (retryErr: any) {
+        lastError = retryErr;
+        console.log(`[${sessionId}] Withdraw attempt ${attempt} failed: ${retryErr.message}`);
+        if (attempt < maxRetries) {
+          // Wait before retry, with increasing delay
+          const delay = 5000 * attempt;
+          console.log(`[${sessionId}] Waiting ${delay/1000}s before retry...`);
+          await new Promise(r => setTimeout(r, delay));
+        }
+      }
+    }
+    
+    if (!withdrawResult) {
+      throw new Error(`Withdrawal failed after ${maxRetries} attempts: ${lastError?.message}`);
+    }
     
     session.withdrawTx = withdrawResult?.tx || 'confirmed';
     session.step = 'complete';
