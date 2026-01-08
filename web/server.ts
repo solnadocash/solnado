@@ -249,39 +249,55 @@ app.post('/api/submit-deposit', async (req, res) => {
     console.log(`[${sessionId}] Sweeping temp wallet to main relayer...`);
     
     const tempBalance = await connection.getBalance(tempKeypair.publicKey);
-    const sweepAmount = tempBalance - 5000; // Leave 5000 lamports for fee
+    const sweepFee = 5000; // Gas for sweep tx
+    const sweepAmount = tempBalance - sweepFee;
     
-    if (sweepAmount > 0) {
-      const sweepTx = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: tempKeypair.publicKey,
-          toPubkey: relayerKeypair.publicKey,
-          lamports: sweepAmount
-        })
-      );
-      await sendAndConfirmTransaction(connection, sweepTx, [tempKeypair]);
-      updateTempWallet(tempWalletPubkey, { status: 'swept' });
-      console.log(`[${sessionId}] Swept ${sweepAmount / LAMPORTS_PER_SOL} SOL to main relayer`);
+    if (sweepAmount <= 0) {
+      throw new Error('Temp wallet has no funds to sweep');
     }
+    
+    const sweepTx = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: tempKeypair.publicKey,
+        toPubkey: relayerKeypair.publicKey,
+        lamports: sweepAmount
+      })
+    );
+    await sendAndConfirmTransaction(connection, sweepTx, [tempKeypair]);
+    updateTempWallet(tempWalletPubkey, { status: 'swept' });
+    console.log(`[${sessionId}] Swept ${sweepAmount / LAMPORTS_PER_SOL} SOL to main relayer`);
+
+    // Calculate amounts - relayer fee is taken from swept amount BEFORE deposit
+    // This way the sender pays all fees, not the receiver
+    const RELAYER_FEE = 2_000_000; // 0.002 SOL relayer fee
+    const depositAmount = sweepAmount - RELAYER_FEE;
+    
+    if (depositAmount < 10_000_000) { // Min 0.01 SOL deposit
+      throw new Error('Amount too small after relayer fee');
+    }
+    
+    console.log(`[${sessionId}] Relayer fee: ${RELAYER_FEE / LAMPORTS_PER_SOL} SOL, Depositing: ${depositAmount / LAMPORTS_PER_SOL} SOL`);
 
     // Step 2: Deposit to PrivacyCash shielded pool
     session.step = 'shielding';
     console.log(`[${sessionId}] Depositing to shielded pool...`);
     
     const depositResult = await privacyCash.deposit({
-      lamports: session.amountLamports
+      lamports: depositAmount
     });
     console.log(`[${sessionId}] Pool deposit TX: ${depositResult?.tx || 'done'}`);
 
     // Wait for pool state to update (longer wait to let Merkle tree settle)
     await new Promise(r => setTimeout(r, 8000));
 
-    // Step 3: Withdraw from pool to recipient (with retry logic)
+    // Step 3: Withdraw 100% from pool to recipient (NO CHANGE LEFT!)
     session.step = 'withdrawing';
-    console.log(`[${sessionId}] Withdrawing to recipient...`);
     
-    const fee = 5_000_000; // 0.005 SOL relayer fee
-    const withdrawAmount = session.amountLamports - fee;
+    // Get exact pool balance to withdraw everything
+    const poolBalance = await privacyCash.getPrivateBalance();
+    console.log(`[${sessionId}] Withdrawing ${poolBalance / LAMPORTS_PER_SOL} SOL to recipient (100% of pool)...`);
+    
+    const withdrawAmount = poolBalance; // Withdraw EVERYTHING - no stuck funds!
 
     let withdrawResult: any = null;
     let lastError: any = null;
