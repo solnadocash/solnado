@@ -76,6 +76,11 @@
     }
     input:focus { border-color: var(--accent); }
     input::placeholder { color: var(--dim); }
+    .fee-info {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
     .btn {
       width: 100%;
       padding: 14px;
@@ -93,6 +98,122 @@
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn:hover:not(:disabled) { background: var(--green); }
     .hint { text-align: center; font-size: 10px; color: var(--muted); margin-top: 16px; }
+    
+    /* Transaction Flow Visualization */
+    .tx-flow {
+      margin-top: 24px;
+      padding: 20px 0;
+      border-top: 1px solid var(--border);
+      display: none;
+    }
+    .tx-flow.active { display: block; }
+    .flow-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      padding: 0 8px;
+    }
+    .flow-line {
+      position: absolute;
+      top: 50%;
+      left: 32px;
+      right: 32px;
+      height: 2px;
+      background: var(--border);
+      transform: translateY(-50%);
+      z-index: 0;
+    }
+    .flow-progress {
+      position: absolute;
+      top: 50%;
+      left: 32px;
+      height: 2px;
+      background: var(--green);
+      transform: translateY(-50%);
+      z-index: 1;
+      width: 0;
+      transition: width 0.5s ease;
+    }
+    .flow-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 2;
+      position: relative;
+    }
+    .node-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--card);
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: var(--dim);
+      transition: all 0.3s ease;
+    }
+    .flow-node.active .node-icon {
+      border-color: var(--green);
+      color: var(--green);
+      animation: pulse 1.5s infinite;
+    }
+    .flow-node.done .node-icon {
+      background: var(--green);
+      border-color: var(--green);
+      color: var(--bg);
+    }
+    .node-label {
+      font-size: 9px;
+      color: var(--dim);
+      margin-top: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: color 0.3s;
+    }
+    .flow-node.active .node-label { color: var(--green); }
+    .flow-node.done .node-label { color: var(--muted); }
+    
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(74, 124, 74, 0.4); }
+      50% { box-shadow: 0 0 0 8px rgba(74, 124, 74, 0); }
+    }
+    
+    /* Moving dot animation */
+    .flow-dot {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 3;
+      opacity: 0;
+      box-shadow: 0 0 8px var(--green);
+    }
+    .flow-dot.moving {
+      opacity: 1;
+      animation: moveDot 2s ease-in-out infinite;
+    }
+    @keyframes moveDot {
+      0% { left: 32px; opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { left: calc(100% - 32px); opacity: 0; }
+    }
+    
+    .tx-status {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 11px;
+      color: var(--muted);
+      min-height: 20px;
+    }
+    .tx-status.highlight { color: var(--green); }
+
     .status {
       margin-top: 16px;
       padding: 12px;
@@ -104,6 +225,7 @@
     .status-success { background: rgba(74,124,74,0.15); border: 1px solid var(--green); color: #7ab87a; }
     .status-error { background: rgba(139,58,58,0.15); border: 1px solid var(--red); color: #c27474; }
     .status a { color: inherit; }
+    
     .spinner {
       width: 12px; height: 12px;
       border: 2px solid var(--dim);
@@ -115,20 +237,16 @@
       vertical-align: middle;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .steps { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
-    .step { display: flex; align-items: center; gap: 10px; padding: 8px 0; color: var(--dim); font-size: 12px; }
-    .step.active { color: var(--text); }
-    .step.done { color: var(--green); }
-    .step-num {
-      width: 20px; height: 20px;
-      border: 1px solid currentColor;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 10px; flex-shrink: 0;
-    }
-    .step.done .step-num { background: var(--green); border-color: var(--green); color: #000; }
+    
     .footer { margin-top: 40px; font-size: 10px; color: var(--dim); }
-    .footer a { color: var(--muted); }
+    .footer a { color: var(--muted); text-decoration: none; }
+    .footer a:hover { color: var(--text); }
+
+    @media (max-width: 480px) {
+      .card { padding: 24px 20px; }
+      .node-label { font-size: 8px; }
+      .node-icon { width: 24px; height: 24px; font-size: 10px; }
+    }
   </style>
 </head>
 <body>
@@ -160,6 +278,7 @@
       <div class="form-group">
         <label>Amount (SOL)</label>
         <input type="number" id="amount" placeholder="0.00" step="0.01" min="0.01">
+        <div class="fee-info">Fee: 0.005 SOL</div>
       </div>
 
       <div class="form-group">
@@ -174,19 +293,31 @@
       <p class="hint">Funds are protected by default</p>
     </div>
 
-    <div class="steps" id="steps" style="display: none;">
-      <div class="step" id="step1">
-        <span class="step-num">1</span>
-        <span>Depositing to shielded pool</span>
+    <!-- Transaction Flow Visualization -->
+    <div class="tx-flow" id="txFlow">
+      <div class="flow-container">
+        <div class="flow-line"></div>
+        <div class="flow-progress" id="flowProgress"></div>
+        <div class="flow-dot" id="flowDot"></div>
+        
+        <div class="flow-node" id="node1">
+          <div class="node-icon">W</div>
+          <span class="node-label">Wallet</span>
+        </div>
+        <div class="flow-node" id="node2">
+          <div class="node-icon">R</div>
+          <span class="node-label">Relayer</span>
+        </div>
+        <div class="flow-node" id="node3">
+          <div class="node-icon">S</div>
+          <span class="node-label">Shield</span>
+        </div>
+        <div class="flow-node" id="node4">
+          <div class="node-icon">+</div>
+          <span class="node-label">Recipient</span>
+        </div>
       </div>
-      <div class="step" id="step2">
-        <span class="step-num">2</span>
-        <span>Generating ZK proof</span>
-      </div>
-      <div class="step" id="step3">
-        <span class="step-num">3</span>
-        <span>Withdrawing to recipient</span>
-      </div>
+      <div class="tx-status" id="txStatus"></div>
     </div>
 
     <div id="status"></div>
@@ -197,7 +328,7 @@
     <span style="color: var(--dim);">|</span>
     <a href="https://github.com/solnadocash/solnado" target="_blank">github</a>
     <span style="color: var(--dim);">|</span>
-    <a href="/docs" target="_blank">docs</a>
+    <a href="/docs">docs</a>
   </div>
 
   <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
@@ -210,14 +341,39 @@
       document.getElementById('status').innerHTML = `<div class="status status-${type}">${msg}</div>`;
     }
 
-    function setStep(n, state) {
-      document.getElementById('steps').style.display = 'block';
-      for (let i = 1; i <= 3; i++) {
-        const el = document.getElementById('step' + i);
-        el.classList.remove('active', 'done');
-        if (i < n) el.classList.add('done');
-        else if (i === n) el.classList.add(state === 'done' ? 'done' : 'active');
+    function setFlowStep(step, statusText) {
+      const flow = document.getElementById('txFlow');
+      const progress = document.getElementById('flowProgress');
+      const dot = document.getElementById('flowDot');
+      const txStatus = document.getElementById('txStatus');
+      
+      flow.classList.add('active');
+      txStatus.textContent = statusText;
+      txStatus.classList.toggle('highlight', step > 0 && step < 5);
+      
+      // Reset all nodes
+      for (let i = 1; i <= 4; i++) {
+        const node = document.getElementById('node' + i);
+        node.classList.remove('active', 'done');
+        if (i < step) node.classList.add('done');
+        else if (i === step) node.classList.add('active');
       }
+      
+      // Progress bar width (0%, 33%, 66%, 100%)
+      const progressPercent = Math.max(0, (step - 1) * 33.33);
+      progress.style.width = progressPercent + '%';
+      
+      // Show moving dot during active transfer
+      if (step > 0 && step < 5) {
+        dot.classList.add('moving');
+      } else {
+        dot.classList.remove('moving');
+      }
+    }
+
+    function hideFlow() {
+      document.getElementById('txFlow').classList.remove('active');
+      document.getElementById('flowDot').classList.remove('moving');
     }
 
     async function connectWallet() {
@@ -274,9 +430,8 @@
       document.getElementById('status').innerHTML = '';
 
       try {
-        // Step 1: Get unsigned deposit transaction from server
-        setStep(1, 'active');
-        showStatus('Preparing deposit...', 'info');
+        // Step 1: Wallet -> Relayer
+        setFlowStep(1, 'Preparing transaction...');
 
         const prepRes = await fetch('/api/prepare-deposit', {
           method: 'POST',
@@ -291,8 +446,8 @@
         const prepData = await prepRes.json();
         if (prepData.error) throw new Error(prepData.error);
 
-        // Step 2: Sign with Phantom
-        showStatus('Sign the transaction in your wallet...', 'info');
+        // Sign with Phantom
+        setFlowStep(1, 'Sign in wallet...');
         
         const txBytes = Uint8Array.from(atob(prepData.unsignedTx), c => c.charCodeAt(0));
         const tx = solanaWeb3.Transaction.from(txBytes);
@@ -300,10 +455,8 @@
         const signed = await window.solana.signTransaction(tx);
         const signedBase64 = btoa(String.fromCharCode(...signed.serialize()));
 
-        // Step 3: Submit and process
-        setStep(1, 'done');
-        setStep(2, 'active');
-        showStatus('Processing through shielded pool...', 'info');
+        // Step 2: Relayer received
+        setFlowStep(2, 'Sending to relayer...');
 
         const submitRes = await fetch('/api/submit-deposit', {
           method: 'POST',
@@ -320,23 +473,28 @@
         // Poll for completion
         let complete = false;
         while (!complete) {
-          await new Promise(r => setTimeout(r, 3000));
+          await new Promise(r => setTimeout(r, 2000));
           
           const statusRes = await fetch(`/api/status/${prepData.sessionId}`);
           const status = await statusRes.json();
 
-          if (status.step === 'withdrawing') {
-            setStep(2, 'done');
-            setStep(3, 'active');
-            showStatus('Withdrawing to recipient...', 'info');
+          if (status.step === 'depositing') {
+            setFlowStep(2, 'Relayer processing...');
+          } else if (status.step === 'shielding') {
+            setFlowStep(3, 'Shielding funds...');
+          } else if (status.step === 'withdrawing') {
+            setFlowStep(4, 'Withdrawing to recipient...');
           } else if (status.step === 'complete') {
-            setStep(3, 'done');
-            showStatus(
-              `Sent ${amount} SOL privately!<br>
-              <a href="https://solscan.io/tx/${status.depositTx}" target="_blank">Deposit</a> | 
-              <a href="https://solscan.io/tx/${status.withdrawTx}" target="_blank">Withdraw</a>`,
-              'success'
-            );
+            setFlowStep(5, 'Complete');
+            setTimeout(() => {
+              hideFlow();
+              showStatus(
+                `Sent ${amount} SOL privately<br>
+                <a href="https://solscan.io/tx/${status.depositTx}" target="_blank">View deposit</a> · 
+                <a href="https://solscan.io/tx/${status.withdrawTx}" target="_blank">View withdraw</a>`,
+                'success'
+              );
+            }, 1500);
             complete = true;
           } else if (status.step === 'failed') {
             throw new Error(status.error || 'Transfer failed');
@@ -348,8 +506,8 @@
         await updateBalance();
 
       } catch (err) {
+        hideFlow();
         showStatus(err.message, 'error');
-        document.getElementById('steps').style.display = 'none';
       } finally {
         btn.disabled = false;
         btn.innerHTML = 'Send privately';
