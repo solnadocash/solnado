@@ -10,7 +10,7 @@
     "start": "node dist/web/server.js",
     "start:web": "tsx web/server.ts",
     "vercel-build": "npm run build",
-    "postinstall": "cd node_modules/privacycash && npm install && npm run build || true"
+    "postinstall": "cd node_modules/privacycash && npm install && npm run build || true && cd ../.. && node scripts/apply-patches.js"
   },
   "engines": {
     "node": ">=18"
