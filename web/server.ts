@@ -1,6 +1,6 @@
 /**
  * Solnado Server
- * Simple SOL transfer server - privacy features coming soon
+ * Private SOL transfers using PrivacyCash shielded pool
  */
 
 import express from 'express';
@@ -10,6 +10,9 @@ import { fileURLToPath } from 'url';
 import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
 import bs58 from 'bs58';
 
+// @ts-ignore - privacycash types
+import { PrivacyCash } from 'privacycash';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -17,16 +20,25 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const RPC_URL = process.env.RPC_URL || 'https://mainnet.helius-rpc.com/?api-key=da8de8e3-afd3-457e-9820-a62102ca3c9b';
 
-// Relayer wallet
+// Relayer wallet - this funds the pool operations
 const RELAYER_KEY = process.env.RELAYER_PRIVATE_KEY;
 let relayerKeypair: Keypair | null = null;
+let privacyCash: any = null;
 
 if (RELAYER_KEY) {
   try {
     relayerKeypair = Keypair.fromSecretKey(bs58.decode(RELAYER_KEY));
     console.log(`Relayer: ${relayerKeypair.publicKey.toBase58()}`);
+    
+    // Initialize PrivacyCash with relayer's key
+    privacyCash = new PrivacyCash({
+      RPC_url: RPC_URL,
+      owner: Array.from(relayerKeypair.secretKey),
+      enableDebug: true
+    });
+    console.log('PrivacyCash SDK initialized');
   } catch (e) {
-    console.error('Invalid RELAYER_PRIVATE_KEY');
+    console.error('Failed to initialize:', e);
   }
 }
 
@@ -47,6 +59,7 @@ const sessions = new Map<string, {
 
 /**
  * POST /api/prepare-deposit
+ * Step 1: User sends SOL to relayer, who will deposit to shielded pool
  */
 app.post('/api/prepare-deposit', async (req, res) => {
   const { senderAddress, recipientAddress, amountSol } = req.body;
@@ -55,7 +68,7 @@ app.post('/api/prepare-deposit', async (req, res) => {
     return res.status(400).json({ error: 'Missing fields' });
   }
 
-  if (!relayerKeypair) {
+  if (!relayerKeypair || !privacyCash) {
     return res.status(500).json({ error: 'Relayer not configured' });
   }
 
@@ -65,7 +78,7 @@ app.post('/api/prepare-deposit', async (req, res) => {
     const connection = new Connection(RPC_URL, 'confirmed');
     const sender = new PublicKey(senderAddress);
 
-    // User sends to relayer
+    // User sends to relayer (who will then deposit to shielded pool)
     const tx = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: sender,
@@ -95,60 +108,76 @@ app.post('/api/prepare-deposit', async (req, res) => {
     res.json({ sessionId, unsignedTx: base64Tx });
 
   } catch (err: any) {
+    console.error('Prepare error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
 /**
  * POST /api/submit-deposit
+ * Step 2: After user signs, submit their tx, then do pool deposit + withdraw
  */
 app.post('/api/submit-deposit', async (req, res) => {
   const { signedTx, sessionId } = req.body;
   const session = sessions.get(sessionId);
 
-  if (!session || !relayerKeypair) {
-    return res.status(400).json({ error: 'Session expired or relayer not configured' });
+  if (!session) {
+    return res.status(400).json({ error: 'Session expired' });
+  }
+
+  if (!relayerKeypair || !privacyCash) {
+    return res.status(500).json({ error: 'Relayer not configured' });
   }
 
   try {
     const connection = new Connection(RPC_URL, 'confirmed');
     const txBuffer = Buffer.from(signedTx, 'base64');
 
+    // Step 1: Submit user's deposit to relayer
     session.step = 'depositing';
-    const depositTx = await connection.sendRawTransaction(txBuffer);
-    await connection.confirmTransaction(depositTx, 'confirmed');
-    session.depositTx = depositTx;
+    console.log(`[${sessionId}] Submitting user deposit...`);
+    
+    const userDepositTx = await connection.sendRawTransaction(txBuffer);
+    await connection.confirmTransaction(userDepositTx, 'confirmed');
+    session.depositTx = userDepositTx;
+    console.log(`[${sessionId}] User deposit confirmed: ${userDepositTx}`);
 
-    console.log(`[${sessionId}] Deposit: ${depositTx}`);
+    // Step 2: Deposit to PrivacyCash shielded pool
+    session.step = 'shielding';
+    console.log(`[${sessionId}] Depositing to shielded pool...`);
+    
+    const depositResult = await privacyCash.deposit({
+      lamports: session.amountLamports
+    });
+    console.log(`[${sessionId}] Pool deposit TX: ${depositResult?.tx || 'done'}`);
 
-    // Forward to recipient
+    // Wait for pool state to update
+    await new Promise(r => setTimeout(r, 5000));
+
+    // Step 3: Withdraw from pool to recipient
     session.step = 'withdrawing';
-    const fee = 5_000_000; // 0.005 SOL fee
-    const sendAmount = session.amountLamports - fee;
+    console.log(`[${sessionId}] Withdrawing to recipient...`);
+    
+    const fee = 5_000_000; // 0.005 SOL relayer fee
+    const withdrawAmount = session.amountLamports - fee;
 
-    const withdrawTx = new Transaction().add(
-      SystemProgram.transfer({
-        fromPubkey: relayerKeypair.publicKey,
-        toPubkey: new PublicKey(session.recipientAddress),
-        lamports: sendAmount
-      })
-    );
-
-    const { blockhash } = await connection.getLatestBlockhash();
-    withdrawTx.recentBlockhash = blockhash;
-    withdrawTx.feePayer = relayerKeypair.publicKey;
-    withdrawTx.sign(relayerKeypair);
-
-    const withdrawSig = await connection.sendRawTransaction(withdrawTx.serialize());
-    await connection.confirmTransaction(withdrawSig, 'confirmed');
-
-    session.withdrawTx = withdrawSig;
+    const withdrawResult = await privacyCash.withdraw({
+      lamports: withdrawAmount,
+      recipientAddress: session.recipientAddress
+    });
+    
+    session.withdrawTx = withdrawResult?.tx || 'confirmed';
     session.step = 'complete';
+    console.log(`[${sessionId}] Withdraw TX: ${session.withdrawTx}`);
 
-    console.log(`[${sessionId}] Withdraw: ${withdrawSig}`);
-    res.json({ success: true, depositTx, withdrawTx: withdrawSig });
+    res.json({ 
+      success: true, 
+      depositTx: depositResult?.tx || userDepositTx,
+      withdrawTx: session.withdrawTx 
+    });
 
   } catch (err: any) {
+    console.error(`[${sessionId}] Error:`, err);
     session.step = 'failed';
     session.error = err.message;
     res.status(500).json({ error: err.message });
@@ -177,6 +206,22 @@ app.get('/api/balance/:address', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/private-balance
+ * Get relayer's shielded pool balance
+ */
+app.get('/api/private-balance', async (req, res) => {
+  try {
+    if (!privacyCash) {
+      return res.json({ balance: 0 });
+    }
+    const balance = await privacyCash.getPrivateBalance();
+    res.json({ balance: (balance || 0) / LAMPORTS_PER_SOL });
+  } catch (err: any) {
+    res.json({ balance: 0 });
+  }
+});
+
 // Serve frontend
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
@@ -185,4 +230,5 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Solnado Server running on port ${PORT}`);
   console.log(`Relayer: ${relayerKeypair?.publicKey.toBase58() || 'NOT SET'}`);
+  console.log(`PrivacyCash: ${privacyCash ? 'READY' : 'NOT INITIALIZED'}`);
 });
