@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solnado Docs</title>
+  <link rel="icon" type="image/png" href="/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0a0a;
+      --card: #141414;
+      --border: #222;
+      --text: #e5e5e5;
+      --muted: #666;
+      --accent: #3d5a3d;
+      --green: #4a7c4a;
+    }
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 40px 20px;
+      line-height: 1.7;
+    }
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 48px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo { width: 48px; height: 48px; }
+    h1 { font-size: 24px; font-weight: 500; }
+    h2 { font-size: 16px; font-weight: 500; margin: 32px 0 16px; color: var(--green); }
+    h3 { font-size: 14px; font-weight: 500; margin: 24px 0 12px; }
+    p { margin-bottom: 16px; font-size: 13px; color: var(--text); }
+    code {
+      background: var(--card);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 12px;
+    }
+    pre {
+      background: var(--card);
+      padding: 16px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 16px 0;
+      font-size: 12px;
+      border: 1px solid var(--border);
+    }
+    a { color: var(--green); }
+    .nav { margin-bottom: 32px; }
+    .nav a { color: var(--muted); font-size: 12px; }
+    ul { margin-left: 20px; margin-bottom: 16px; }
+    li { margin-bottom: 8px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <a href="/">← Back to App</a>
+    </div>
+
+    <div class="header">
+      <img src="/logo.png" alt="Solnado" class="logo">
+      <h1>Solnado Documentation</h1>
+    </div>
+
+    <h2>What is Solnado?</h2>
+    <p>
+      Solnado is a privacy layer for Solana that enables private SOL transfers. 
+      Using zero-knowledge proofs and shielded pools, Solnado breaks the on-chain 
+      link between sender and recipient.
+    </p>
+
+    <h2>How It Works</h2>
+    <p>When you send SOL privately through Solnado:</p>
+    <ul>
+      <li><strong>Step 1:</strong> Your SOL is deposited into a shielded pool</li>
+      <li><strong>Step 2:</strong> A zero-knowledge proof is generated</li>
+      <li><strong>Step 3:</strong> SOL is withdrawn to the recipient from the pool</li>
+    </ul>
+    <p>
+      The ZK proof ensures that only the amount is verified, not the connection 
+      between deposit and withdrawal. This breaks the on-chain link.
+    </p>
+
+    <h2>Privacy Model</h2>
+    <p>
+      Solnado uses the PrivacyCash protocol, which implements:
+    </p>
+    <ul>
+      <li>Shielded pool with Merkle tree commitments</li>
+      <li>Zero-knowledge proofs for withdrawal authorization</li>
+      <li>Nullifiers to prevent double-spending</li>
+      <li>Relayer for gas abstraction and additional privacy</li>
+    </ul>
+
+    <h2>Fees</h2>
+    <p>
+      A small relayer fee (currently 0.005 SOL) is deducted from each transfer. 
+      This covers gas costs and relayer operation.
+    </p>
+
+    <h2>Using Solnado</h2>
+    <h3>1. Connect Wallet</h3>
+    <p>Click "Connect Wallet" and approve the connection in Phantom.</p>
+
+    <h3>2. Enter Amount</h3>
+    <p>Enter the amount of SOL you want to send (minimum 0.01 SOL).</p>
+
+    <h3>3. Enter Recipient</h3>
+    <p>Paste the recipient's Solana wallet address.</p>
+
+    <h3>4. Send Privately</h3>
+    <p>Click "Send privately" and sign the transaction in your wallet.</p>
+
+    <h2>Technical Details</h2>
+    <p>
+      Solnado is built on:
+    </p>
+    <ul>
+      <li><a href="https://github.com/Privacy-Cash/privacy-cash-sdk" target="_blank">PrivacyCash SDK</a> - ZK proof generation</li>
+      <li>Solana blockchain - Fast, low-cost transactions</li>
+      <li>Cloudflare Tunnel - Secure, hidden infrastructure</li>
+    </ul>
+
+    <h2>Source Code</h2>
+    <p>
+      Solnado is open source: 
+      <a href="https://github.com/solnadocash/solnado" target="_blank">github.com/solnadocash/solnado</a>
+    </p>
+
+    <h2>Contact</h2>
+    <p>
+      Twitter: <a href="https://x.com/solnadocash" target="_blank">@solnadocash</a>
+    </p>
+  </div>
+</body>
+</html>
+

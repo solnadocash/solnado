@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Solnado</title>
+  <link rel="icon" type="image/png" href="/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -39,7 +40,10 @@
       width: 100%;
       max-width: 420px;
     }
-    h1 { font-size: 18px; font-weight: 500; margin-bottom: 6px; }
+    .logo { width: 48px; height: 48px; }
+    .header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+    h1 { font-size: 18px; font-weight: 500; margin: 0; }
+    .header .tagline { margin-bottom: 0; margin-top: 4px; }
     .tagline { color: var(--muted); font-size: 11px; margin-bottom: 24px; }
     .balance-row {
       display: flex;
@@ -129,8 +133,13 @@
 </head>
 <body>
   <div class="card">
-    <h1>Send SOL</h1>
-    <p class="tagline">privacy where money-privacy doesn't reach</p>
+    <div class="header">
+      <img src="/logo.png" alt="Solnado" class="logo">
+      <div>
+        <h1>Send SOL</h1>
+        <p class="tagline">privacy where money-privacy doesn't reach</p>
+      </div>
+    </div>
 
     <div class="balance-row">
       <span class="balance-label">Wallet balance</span>
@@ -184,7 +193,11 @@
   </div>
 
   <div class="footer">
+    <a href="https://x.com/solnadocash" target="_blank">twitter</a>
+    <span style="color: var(--dim);">|</span>
     <a href="https://github.com/solnadocash/solnado" target="_blank">github</a>
+    <span style="color: var(--dim);">|</span>
+    <a href="/docs" target="_blank">docs</a>
   </div>
 
   <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
