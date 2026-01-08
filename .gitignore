@@ -11,3 +11,7 @@ Thumbs.db
 *.swo
 cache/
 
+# CRITICAL: Never commit temp wallet keys
+data/
+temp-wallets.json
+vanity-keypair.json
