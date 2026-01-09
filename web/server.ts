@@ -333,11 +333,19 @@ app.post('/api/submit-deposit', async (req, res) => {
     // Step 3: Withdraw 100% from pool to recipient (NO CHANGE LEFT!)
     session.step = 'withdrawing';
     
-    // Get exact pool balance to withdraw everything
-    const poolBalance = await privacyCash.getPrivateBalance();
-    console.log(`[${sessionId}] Withdrawing ${poolBalance / LAMPORTS_PER_SOL} SOL to recipient (100% of pool)...`);
+    // Get exact pool balance - SDK returns object with lamports property
+    const balanceResult = await privacyCash.getPrivateBalance();
+    const poolBalance = typeof balanceResult === 'number' ? balanceResult : 
+                        (balanceResult?.lamports || balanceResult?.balance || depositAmount);
     
-    const withdrawAmount = poolBalance; // Withdraw EVERYTHING - no stuck funds!
+    console.log(`[${sessionId}] Pool balance: ${poolBalance} lamports (${poolBalance / LAMPORTS_PER_SOL} SOL)`);
+    
+    // Calculate withdrawal with protocol fee (~3%)
+    const protocolFeeRate = 0.03;
+    const protocolFee = Math.ceil(poolBalance * protocolFeeRate);
+    const withdrawToRecipient = poolBalance - protocolFee;
+    
+    console.log(`[${sessionId}] Withdrawing ${withdrawToRecipient / LAMPORTS_PER_SOL} SOL to recipient (fee: ${protocolFee / LAMPORTS_PER_SOL} SOL)...`);
 
     let withdrawResult: any = null;
     let lastError: any = null;
@@ -346,8 +354,10 @@ app.post('/api/submit-deposit', async (req, res) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`[${sessionId}] Withdraw attempt ${attempt}/${maxRetries}...`);
+        // SDK expects extAmount (what recipient gets) and fee (protocol fee)
         withdrawResult = await privacyCash.withdraw({
-          lamports: withdrawAmount,
+          extAmount: withdrawToRecipient,
+          fee: protocolFee,
           recipientAddress: session.recipientAddress
         });
         break; // Success, exit loop
