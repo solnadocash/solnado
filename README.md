@@ -5,7 +5,7 @@ Privacy where money-privacy doesn't reach.
 
 ## Overview
 
-Solnado enables private SOL transfers using zero-knowledge proofs. Send SOL to any address without revealing the connection between sender and recipient.
+Solnado Cash enables private SOL transfers using zero-knowledge proofs. Send SOL to any address without revealing the connection between sender and recipient.
 
 ## Features
 
