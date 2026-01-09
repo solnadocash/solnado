@@ -291,6 +291,10 @@
     </div>
 
     <div id="sendSection" style="display: none;">
+      <div style="background: rgba(139,58,58,0.15); border: 1px solid var(--red); border-radius: 4px; padding: 10px 12px; margin-bottom: 16px; font-size: 10px; color: #c27474;">
+        ⚠️ <strong>Don't use exchange wallets</strong> (Binance, Coinbase, Kraken, etc.) — recipient must be a personal wallet you control.
+      </div>
+
       <div class="form-group">
         <label>Amount to send (SOL)</label>
         <input type="number" id="amount" placeholder="0.00" step="0.01" min="0.02" oninput="updateFeeDisplay()">
@@ -315,7 +319,8 @@
         Send privately
       </button>
 
-      <p class="hint">~8% fee for small amounts, ~1% for larger transfers</p>
+      <p class="hint">Fee: ~0.007 SOL + 0.35% (lower % for larger amounts)</p>
+      <p class="hint" style="color: #c27474; margin-top: 8px;">⚠️ Don't use exchange wallets (Binance, Coinbase, etc.)</p>
     </div>
 
     <!-- Transaction Flow Visualization -->

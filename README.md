@@ -22,13 +22,20 @@ Solnado Cash enables private SOL transfers using zero-knowledge proofs. Send SOL
 
 ## Fees
 
-| Amount | Approximate Fee |
-|--------|-----------------|
-| 0.1 SOL | ~8% |
-| 0.5 SOL | ~2% |
-| 1+ SOL | ~1% |
+**Fixed:** ~0.007 SOL + **Variable:** 0.35% of amount
 
-Fees include network costs and privacy pool operations. Lower percentage for larger transfers.
+| Amount | Total Fee | Percentage |
+|--------|-----------|------------|
+| 0.1 SOL | ~0.0074 SOL | ~7.4% |
+| 0.5 SOL | ~0.0088 SOL | ~1.8% |
+| 1 SOL | ~0.0105 SOL | ~1.1% |
+| 5 SOL | ~0.0245 SOL | ~0.5% |
+
+Fees cover network costs, privacy pool operations, and relayer services. Lower percentage for larger transfers.
+
+## ⚠️ Important
+
+**Don't use exchange wallets** (Binance, Coinbase, Kraken, etc.) as recipient addresses. Only use personal wallets you control.
 
 ## Usage
 
