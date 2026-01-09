@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SolnaDoCash - Private SOL Transfers</title>
+  <title>Solnado - Private SOL Transfers</title>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -376,7 +376,7 @@
   
   <div class="app">
     <div class="logo">
-      <h1>SolnaDoCash</h1>
+      <h1>Solnado</h1>
       <p>Private SOL transfers on Solana</p>
     </div>
 
@@ -416,11 +416,12 @@
             <span class="fee-val" id="feeSend">0.00 SOL</span>
           </div>
           <div class="fee-row">
-            <span>~Recipient gets</span>
+            <span>Recipient gets</span>
             <span class="fee-val" id="feeRecipient">~0.00 SOL</span>
           </div>
-          <div class="fee-row" style="font-size: 12px; color: var(--text-dim);">
-            <span>(fees: 0.35% + 0.007 SOL)</span>
+          <div class="fee-row">
+            <span>Privacy fee</span>
+            <span class="fee-val" id="feePct">~0%</span>
           </div>
         </div>
 
@@ -459,7 +460,7 @@
       <div id="tab-about" style="display: none;">
         <div style="color: var(--text-dim); font-size: 14px; line-height: 1.7;">
           <p style="margin-bottom: 16px;">
-            <strong style="color: var(--text);">SolnaDoCash</strong> enables private SOL transfers on Solana using the PrivacyCash shielded pool.
+            <strong style="color: var(--text);">Solnado</strong> enables private SOL transfers on Solana using zero-knowledge proofs.
           </p>
           
           <p style="margin-bottom: 16px;">
@@ -467,28 +468,28 @@
           </p>
           
           <ol style="padding-left: 20px; margin-bottom: 16px;">
-            <li style="margin-bottom: 8px;">Your SOL is deposited into a privacy pool</li>
-            <li style="margin-bottom: 8px;">The pool sends funds to the recipient</li>
-            <li>No on-chain link between you and the recipient</li>
+            <li style="margin-bottom: 8px;">Your SOL is deposited into a shielded pool</li>
+            <li style="margin-bottom: 8px;">ZK proofs verify the transfer privately</li>
+            <li>Recipient receives funds with no on-chain link to you</li>
           </ol>
 
           <p style="margin-bottom: 16px;">
             <strong style="color: var(--text);">Privacy Model:</strong><br>
-            The shielded pool uses zero-knowledge proofs to break the transaction graph. Your deposit and the recipient's withdrawal cannot be linked on-chain.
+            Zero-knowledge proofs break the transaction graph. Your deposit and the recipient's withdrawal cannot be linked on-chain.
           </p>
 
           <p>
             <strong style="color: var(--text);">Fees:</strong><br>
-            ~0.8% total (0.35% + 0.006 SOL protocol + 0.001 SOL relayer). Recipient gets exact amount you enter.
+            ~1-8% depending on amount (lower % for larger transfers). Includes network fees and privacy pool costs.
           </p>
         </div>
       </div>
     </div>
 
     <div class="footer">
-      <span class="badge">Mainnet Beta</span>
+      <span class="badge">Mainnet</span>
       <p style="margin-top: 12px;">
-        Powered by <a href="https://privacycash.org" target="_blank">PrivacyCash</a>
+        Private transfers powered by ZK proofs
       </p>
     </div>
   </div>
@@ -507,12 +508,16 @@
 
     window.updateFee = function() {
       const sendAmount = parseFloat(document.getElementById('amount').value) || 0;
-      // Fees deducted from amount: 0.35% + 0.006 SOL protocol + 0.001 SOL relayer
-      const totalFees = (sendAmount * 0.0035) + 0.006 + 0.001;
+      // Fees: ~0.007 SOL fixed + 0.35% variable
+      const fixedFee = 0.007; // relayer + network
+      const variableFee = sendAmount * 0.0035;
+      const totalFees = fixedFee + variableFee;
       const recipientGets = Math.max(0, sendAmount - totalFees);
+      const feePct = sendAmount > 0 ? (totalFees / sendAmount * 100) : 0;
       
       document.getElementById('feeSend').textContent = sendAmount.toFixed(4) + ' SOL';
       document.getElementById('feeRecipient').textContent = '~' + recipientGets.toFixed(4) + ' SOL';
+      document.getElementById('feePct').textContent = '~' + feePct.toFixed(1) + '%';
     };
 
     function setStep(num, status) {
