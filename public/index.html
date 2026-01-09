@@ -76,10 +76,26 @@
     }
     input:focus { border-color: var(--accent); }
     input::placeholder { color: var(--dim); }
-    .fee-info {
+    .fee-breakdown {
       font-size: 10px;
+      margin-top: 8px;
+      padding: 10px;
+      background: var(--bg);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .fee-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
       color: var(--muted);
-      margin-top: 4px;
+    }
+    .fee-row.total {
+      border-top: 1px solid var(--border);
+      margin-top: 6px;
+      padding-top: 8px;
+      color: var(--text);
+      font-weight: 500;
     }
     .btn {
       width: 100%;
@@ -276,9 +292,22 @@
 
     <div id="sendSection" style="display: none;">
       <div class="form-group">
-        <label>Amount (SOL)</label>
-        <input type="number" id="amount" placeholder="0.00" step="0.01" min="0.01">
-        <div class="fee-info">Fee: 0.005 SOL</div>
+        <label>Recipient receives (SOL)</label>
+        <input type="number" id="amount" placeholder="0.00" step="0.01" min="0.01" oninput="updateFeeDisplay()">
+        <div class="fee-breakdown" id="feeBreakdown">
+          <div class="fee-row">
+            <span>Relayer fee</span>
+            <span id="relayerFee">0.002 SOL</span>
+          </div>
+          <div class="fee-row">
+            <span>Protocol fee (~6.7%)</span>
+            <span id="protocolFee">-- SOL</span>
+          </div>
+          <div class="fee-row total">
+            <span>You pay</span>
+            <span id="totalPay">-- SOL</span>
+          </div>
+        </div>
       </div>
 
       <div class="form-group">
@@ -290,7 +319,7 @@
         Send privately
       </button>
 
-      <p class="hint">Funds are protected by default</p>
+      <p class="hint">Recipient receives exact amount you specify</p>
     </div>
 
     <!-- Transaction Flow Visualization -->
@@ -409,6 +438,29 @@
       } catch (err) {
         console.error('Balance error:', err);
       }
+    }
+
+    // Fee constants (must match server)
+    const RELAYER_FEE = 0.002;  // 0.002 SOL
+    const PROTOCOL_FEE_RATE = 0.067;  // ~6.7%
+    const GAS_FEE = 0.00001;  // ~0.00001 SOL gas buffer
+
+    function updateFeeDisplay() {
+      const amount = parseFloat(document.getElementById('amount').value) || 0;
+      
+      if (amount < 0.01) {
+        document.getElementById('protocolFee').textContent = '-- SOL';
+        document.getElementById('totalPay').textContent = '-- SOL';
+        return;
+      }
+      
+      // Calculate: depositAmount = recipientAmount / (1 - protocolFeeRate)
+      const depositAmount = amount / (1 - PROTOCOL_FEE_RATE);
+      const protocolFee = depositAmount - amount;
+      const totalPay = depositAmount + RELAYER_FEE + GAS_FEE;
+      
+      document.getElementById('protocolFee').textContent = protocolFee.toFixed(4) + ' SOL';
+      document.getElementById('totalPay').textContent = totalPay.toFixed(4) + ' SOL';
     }
 
     async function sendPrivately() {

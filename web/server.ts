@@ -143,9 +143,42 @@ const sessions = new Map<string, {
   error?: string;
 }>();
 
+// Fee constants
+const RELAYER_FEE_LAMPORTS = 2_000_000; // 0.002 SOL relayer fee
+const PROTOCOL_FEE_RATE = 0.067; // ~6.7% PrivacyCash protocol fee on withdrawal
+const GAS_BUFFER_LAMPORTS = 10_000; // Gas buffer for sweep tx
+
+/**
+ * Calculate total amount sender must pay for recipient to receive exact amount
+ */
+function calculateTotalWithFees(recipientAmountLamports: number): {
+  totalLamports: number;
+  depositLamports: number;
+  relayerFee: number;
+  protocolFee: number;
+  gasFee: number;
+} {
+  // Recipient gets: depositAmount * (1 - protocolFeeRate)
+  // So depositAmount = recipientAmount / (1 - protocolFeeRate)
+  const depositLamports = Math.ceil(recipientAmountLamports / (1 - PROTOCOL_FEE_RATE));
+  const protocolFee = depositLamports - recipientAmountLamports;
+  
+  // Total = deposit + relayer fee + gas
+  const totalLamports = depositLamports + RELAYER_FEE_LAMPORTS + GAS_BUFFER_LAMPORTS;
+  
+  return {
+    totalLamports,
+    depositLamports,
+    relayerFee: RELAYER_FEE_LAMPORTS,
+    protocolFee,
+    gasFee: GAS_BUFFER_LAMPORTS
+  };
+}
+
 /**
  * POST /api/prepare-deposit
  * Step 1: User sends SOL to a FRESH temp wallet (max privacy)
+ * Amount includes all fees so recipient gets exact intended amount
  */
 app.post('/api/prepare-deposit', async (req, res) => {
   const { senderAddress, recipientAddress, amountSol } = req.body;
@@ -158,7 +191,11 @@ app.post('/api/prepare-deposit', async (req, res) => {
     return res.status(500).json({ error: 'Relayer not configured' });
   }
 
-  const amountLamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
+  // This is what the RECIPIENT should receive
+  const recipientAmountLamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
+  
+  // Calculate total with all fees included
+  const fees = calculateTotalWithFees(recipientAmountLamports);
 
   try {
     const connection = new Connection(RPC_URL, 'confirmed');
@@ -167,14 +204,14 @@ app.post('/api/prepare-deposit', async (req, res) => {
     const sessionId = `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     
     // Generate FRESH wallet for this transaction (max privacy)
-    const tempWallet = generateTempWallet(sessionId, amountLamports, recipientAddress);
+    const tempWallet = generateTempWallet(sessionId, fees.totalLamports, recipientAddress);
 
-    // User sends to fresh temp wallet (not main relayer)
+    // User sends TOTAL (includes all fees) to fresh temp wallet
     const tx = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: sender,
         toPubkey: new PublicKey(tempWallet.publicKey),
-        lamports: amountLamports
+        lamports: fees.totalLamports
       })
     );
 
@@ -188,15 +225,26 @@ app.post('/api/prepare-deposit', async (req, res) => {
     sessions.set(sessionId, {
       senderAddress,
       recipientAddress,
-      amountLamports,
+      amountLamports: recipientAmountLamports, // What recipient should get
       tempWalletPubkey: tempWallet.publicKey,
       step: 'pending'
     });
 
     setTimeout(() => sessions.delete(sessionId), 10 * 60 * 1000);
 
-    console.log(`[${sessionId}] Prepared: ${amountSol} SOL → temp:${tempWallet.publicKey.slice(0, 8)}... → ${recipientAddress}`);
-    res.json({ sessionId, unsignedTx: base64Tx });
+    console.log(`[${sessionId}] Prepared: ${amountSol} SOL to recipient (total: ${fees.totalLamports / LAMPORTS_PER_SOL} SOL with fees)`);
+    res.json({ 
+      sessionId, 
+      unsignedTx: base64Tx,
+      // Send fee breakdown to frontend
+      fees: {
+        recipientReceives: recipientAmountLamports / LAMPORTS_PER_SOL,
+        totalPay: fees.totalLamports / LAMPORTS_PER_SOL,
+        relayerFee: fees.relayerFee / LAMPORTS_PER_SOL,
+        protocolFee: fees.protocolFee / LAMPORTS_PER_SOL,
+        gasFee: fees.gasFee / LAMPORTS_PER_SOL
+      }
+    });
 
   } catch (err: any) {
     console.error('Prepare error:', err);
