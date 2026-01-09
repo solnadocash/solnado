@@ -1,6 +1,7 @@
-# Solnado
+# Solnado Cash
 
 Private SOL transfers on Solana.
+Privacy where money-privacy doesn't reach.
 
 ## Overview
 
