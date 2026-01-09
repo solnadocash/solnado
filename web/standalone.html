@@ -398,7 +398,7 @@
         </div>
 
         <div class="form-group">
-          <label>Amount recipient gets</label>
+          <label>Amount to send (SOL)</label>
           <div class="input-wrap">
             <input type="number" id="amount" class="input-amount" placeholder="0.00" step="0.01" min="0.01" oninput="updateFee()">
             <span class="suffix">SOL</span>
@@ -412,20 +412,15 @@
 
         <div class="fee-box">
           <div class="fee-row">
-            <span>Recipient gets</span>
-            <span class="fee-val" id="feeRecipient">0.00 SOL</span>
+            <span>You send</span>
+            <span class="fee-val" id="feeSend">0.00 SOL</span>
           </div>
           <div class="fee-row">
-            <span>Protocol fee (0.35% + 0.006)</span>
-            <span class="fee-val" id="feeProtocol">0.00 SOL</span>
+            <span>~Recipient gets</span>
+            <span class="fee-val" id="feeRecipient">~0.00 SOL</span>
           </div>
-          <div class="fee-row">
-            <span>Relayer fee</span>
-            <span class="fee-val">0.001 SOL</span>
-          </div>
-          <div class="fee-row main">
-            <span>You pay</span>
-            <span class="fee-val" id="feeTotal">0.00 SOL</span>
+          <div class="fee-row" style="font-size: 12px; color: var(--text-dim);">
+            <span>(fees: 0.35% + 0.007 SOL)</span>
           </div>
         </div>
 
@@ -511,20 +506,13 @@
     };
 
     window.updateFee = function() {
-      const recipientGets = parseFloat(document.getElementById('amount').value) || 0;
-      // PrivacyCash fees: 0.35% of amount + 0.006 SOL fixed
-      const percentFee = 0.0035; // 0.35%
-      const fixedFee = 0.006; // SOL
-      const relayerFee = 0.001; // SOL
+      const sendAmount = parseFloat(document.getElementById('amount').value) || 0;
+      // Fees deducted from amount: 0.35% + 0.006 SOL protocol + 0.001 SOL relayer
+      const totalFees = (sendAmount * 0.0035) + 0.006 + 0.001;
+      const recipientGets = Math.max(0, sendAmount - totalFees);
       
-      // Pool needs: (recipientGets + fixedFee) / (1 - 0.0035)
-      const poolDeposit = (recipientGets + fixedFee) / (1 - percentFee);
-      const protocolFee = poolDeposit - recipientGets;
-      const totalPay = poolDeposit + relayerFee;
-      
-      document.getElementById('feeRecipient').textContent = recipientGets.toFixed(4) + ' SOL';
-      document.getElementById('feeProtocol').textContent = protocolFee.toFixed(4) + ' SOL';
-      document.getElementById('feeTotal').textContent = totalPay.toFixed(4) + ' SOL';
+      document.getElementById('feeSend').textContent = sendAmount.toFixed(4) + ' SOL';
+      document.getElementById('feeRecipient').textContent = '~' + recipientGets.toFixed(4) + ' SOL';
     };
 
     function setStep(num, status) {

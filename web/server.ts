@@ -143,39 +143,14 @@ const sessions = new Map<string, {
   error?: string;
 }>();
 
-// Fee constants - PrivacyCash: 0.35% + 0.006 SOL fixed
-const PROTOCOL_PERCENT_FEE = 0.0035; // 0.35%
-const PROTOCOL_FIXED_FEE_LAMPORTS = 6_000_000; // 0.006 SOL
-const RELAYER_FEE_LAMPORTS = 1_000_000; // 0.001 SOL relayer fee
-
-/**
- * Calculate total sender must pay for recipient to get exact amount
- * Model: recipient gets X, sender pays X + all fees
- * PrivacyCash fee: 0.35% + 0.006 SOL
- */
-function calculateTotalToPay(recipientAmountLamports: number): {
-  totalToPay: number;
-  poolDeposit: number;
-  protocolFee: number;
-  relayerFee: number;
-} {
-  // Pool needs: (recipientAmount + fixedFee) / (1 - 0.0035)
-  const poolDeposit = Math.ceil((recipientAmountLamports + PROTOCOL_FIXED_FEE_LAMPORTS) / (1 - PROTOCOL_PERCENT_FEE));
-  const protocolFee = poolDeposit - recipientAmountLamports;
-  const totalToPay = poolDeposit + RELAYER_FEE_LAMPORTS;
-  
-  return {
-    totalToPay,
-    poolDeposit,
-    protocolFee,
-    relayerFee: RELAYER_FEE_LAMPORTS
-  };
-}
+// SIMPLIFIED: No fee calculation - sender pays exactly what they enter
+// Fees will be deducted from the amount (recipient gets less)
+const RELAYER_FEE_LAMPORTS = 1_000_000; // 0.001 SOL relayer fee only
 
 /**
  * POST /api/prepare-deposit
  * Step 1: User sends SOL to a FRESH temp wallet (max privacy)
- * Model: user enters recipient amount, sender pays amount + all fees
+ * SIMPLIFIED: sender pays exactly what they enter, fees deducted from recipient
  */
 app.post('/api/prepare-deposit', async (req, res) => {
   const { senderAddress, recipientAddress, amountSol } = req.body;
@@ -188,14 +163,11 @@ app.post('/api/prepare-deposit', async (req, res) => {
     return res.status(500).json({ error: 'Relayer not configured' });
   }
 
-  // This is what the RECIPIENT should get
-  const recipientAmountLamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
-  
-  // Calculate total sender must pay (recipient amount + all fees)
-  const fees = calculateTotalToPay(recipientAmountLamports);
+  // SIMPLIFIED: Sender pays exactly this amount
+  const sendAmountLamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
 
-  if (recipientAmountLamports < 5_000_000) { // Min 0.005 SOL to recipient
-    return res.status(400).json({ error: 'Amount too small' });
+  if (sendAmountLamports < 10_000_000) { // Min 0.01 SOL
+    return res.status(400).json({ error: 'Amount too small (min 0.01 SOL)' });
   }
 
   try {
@@ -205,14 +177,14 @@ app.post('/api/prepare-deposit', async (req, res) => {
     const sessionId = `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     
     // Generate FRESH wallet for this transaction (max privacy)
-    const tempWallet = generateTempWallet(sessionId, fees.totalToPay, recipientAddress);
+    const tempWallet = generateTempWallet(sessionId, sendAmountLamports, recipientAddress);
 
-    // Sender pays: recipient amount + protocol fee + relayer fee
+    // Sender pays EXACTLY what they entered
     const tx = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: sender,
         toPubkey: new PublicKey(tempWallet.publicKey),
-        lamports: fees.totalToPay
+        lamports: sendAmountLamports
       })
     );
 
@@ -226,24 +198,20 @@ app.post('/api/prepare-deposit', async (req, res) => {
     sessions.set(sessionId, {
       senderAddress,
       recipientAddress,
-      amountLamports: fees.totalToPay, // Total sender pays
-      recipientLamports: recipientAmountLamports, // What recipient gets
+      amountLamports: sendAmountLamports,
       tempWalletPubkey: tempWallet.publicKey,
       step: 'pending'
     });
 
     setTimeout(() => sessions.delete(sessionId), 10 * 60 * 1000);
 
-    console.log(`[${sessionId}] Prepared: sender pays ${fees.totalToPay / LAMPORTS_PER_SOL} SOL → recipient gets ${amountSol} SOL`);
+    console.log(`[${sessionId}] Prepared: sender pays EXACTLY ${amountSol} SOL`);
     res.json({ 
       sessionId, 
       unsignedTx: base64Tx,
-      // Send fee breakdown to frontend
       fees: {
-        senderPays: fees.totalToPay / LAMPORTS_PER_SOL,
-        recipientGets: recipientAmountLamports / LAMPORTS_PER_SOL,
-        protocolFee: fees.protocolFee / LAMPORTS_PER_SOL,
-        relayerFee: fees.relayerFee / LAMPORTS_PER_SOL
+        senderPays: amountSol,
+        note: 'Fees deducted from recipient amount'
       }
     });
 
@@ -337,77 +305,50 @@ app.post('/api/submit-deposit', async (req, res) => {
     // Wait for pool state to update (longer wait to let Merkle tree settle)
     await new Promise(r => setTimeout(r, 8000));
 
-    // Step 3: Withdraw 100% from pool to recipient (NO CHANGE LEFT!)
+    // Step 3: Withdraw from pool to recipient
     session.step = 'withdrawing';
     
-    // Get exact pool balance
+    // Get pool balance
     const balanceResult = await privacyCash.getPrivateBalance();
-    console.log(`[${sessionId}] Raw balance result:`, JSON.stringify(balanceResult));
+    console.log(`[${sessionId}] Balance result:`, JSON.stringify(balanceResult));
     
-    // Handle different return formats from SDK
-    let poolBalanceLamports: number;
-    if (typeof balanceResult === 'number') {
-      poolBalanceLamports = balanceResult;
-    } else if (typeof balanceResult === 'object' && balanceResult !== null) {
-      poolBalanceLamports = Number(balanceResult.lamports || balanceResult.balance || balanceResult.amount || depositAmount);
-    } else {
-      poolBalanceLamports = depositAmount;
-    }
+    const poolBalanceLamports = typeof balanceResult === 'object' 
+      ? Number(balanceResult.lamports || balanceResult.balance || depositAmount)
+      : Number(balanceResult || depositAmount);
     
     const poolBalanceSol = poolBalanceLamports / LAMPORTS_PER_SOL;
-    console.log(`[${sessionId}] Pool balance: ${poolBalanceLamports} lamports (${poolBalanceSol} SOL)`);
-    
-    // PrivacyCash fees: 0.35% + 0.006 SOL fixed
-    // Recipient gets: poolBalance - (poolBalance * 0.0035) - 0.006 SOL
-    const PERCENT_FEE = 0.0035; // 0.35%
-    const FIXED_FEE_SOL = 0.006; // 0.006 SOL
-    const estimatedRecipientSol = poolBalanceSol - (poolBalanceSol * PERCENT_FEE) - FIXED_FEE_SOL;
-    
-    console.log(`[${sessionId}] Withdrawing ${poolBalanceSol} SOL to ${session.recipientAddress}`);
-    console.log(`[${sessionId}] Estimated recipient receives: ~${estimatedRecipientSol.toFixed(6)} SOL (after 0.35% + 0.006 SOL fee)`);
+    console.log(`[${sessionId}] Pool balance: ${poolBalanceSol} SOL`);
+    console.log(`[${sessionId}] Withdrawing to: ${session.recipientAddress}`);
 
     let withdrawResult: any = null;
     let lastError: any = null;
-    const maxRetries = 3;
     
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`[${sessionId}] Withdraw attempt ${attempt}/${maxRetries}...`);
-        
-        // Calculate amounts in LAMPORTS for the SDK
-        // PrivacyCash fee: 0.35% + 0.006 SOL (6_000_000 lamports)
-        const FIXED_FEE_LAMPORTS = 6_000_000;
-        const PERCENT_FEE = 0.0035;
-        
-        // extAmount = what recipient gets (negative for withdrawal)
-        // fee = protocol fee
-        // extAmount + fee = total withdrawn from pool
-        const extAmount = Math.floor((poolBalanceLamports - FIXED_FEE_LAMPORTS) / (1 + PERCENT_FEE));
-        const fee = poolBalanceLamports - extAmount;
-        
-        console.log(`[${sessionId}] Calling withdraw with extAmount=${extAmount}, fee=${fee}, recipient=${session.recipientAddress}`);
-        
-        // Try passing as object with lamports
-        withdrawResult = await privacyCash.withdraw({
-          amount: poolBalanceLamports, // Total pool balance in lamports
-          recipient: session.recipientAddress,
-          extAmount: extAmount,
-          fee: fee
-        });
-        break; // Success, exit loop
-      } catch (retryErr: any) {
-        lastError = retryErr;
-        console.log(`[${sessionId}] Withdraw attempt ${attempt} failed: ${retryErr.message}`);
-        if (attempt < maxRetries) {
-          const delay = 5000 * attempt;
-          console.log(`[${sessionId}] Waiting ${delay/1000}s before retry...`);
-          await new Promise(r => setTimeout(r, delay));
-        }
-      }
+    // Try withdraw with just amount and recipient - let SDK handle fees
+    try {
+      console.log(`[${sessionId}] Attempting withdraw...`);
+      
+      // Try the simplest call: just amount in lamports and recipient
+      withdrawResult = await privacyCash.withdraw(poolBalanceLamports, session.recipientAddress);
+      
+    } catch (err: any) {
+      lastError = err;
+      console.log(`[${sessionId}] Withdraw failed: ${err.message}`);
+      
+      // If simple call fails, deposit is still in pool - recipient can claim on privacycash.org
+      console.log(`[${sessionId}] FALLBACK: Funds are in PrivacyCash pool. Recipient can claim at privacycash.org`);
     }
     
     if (!withdrawResult) {
-      throw new Error(`Withdrawal failed after ${maxRetries} attempts: ${lastError?.message}`);
+      // Return partial success - deposit worked, withdrawal needs manual claim
+      session.step = 'deposit_only';
+      res.json({ 
+        success: true,
+        partial: true,
+        depositTx: depositResult?.tx || userDepositTx,
+        message: 'Deposit successful. Recipient must claim at privacycash.org',
+        error: lastError?.message
+      });
+      return;
     }
     
     session.withdrawTx = withdrawResult?.tx || 'confirmed';
