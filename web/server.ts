@@ -374,14 +374,26 @@ app.post('/api/submit-deposit', async (req, res) => {
       try {
         console.log(`[${sessionId}] Withdraw attempt ${attempt}/${maxRetries}...`);
         
-        // SDK takes amount in SOL and recipient address
-        // Fee is calculated internally by the SDK (0.35% + 0.006 SOL)
-        const amountSol = Number(poolBalanceSol);
-        const recipient = String(session.recipientAddress);
+        // Calculate amounts in LAMPORTS for the SDK
+        // PrivacyCash fee: 0.35% + 0.006 SOL (6_000_000 lamports)
+        const FIXED_FEE_LAMPORTS = 6_000_000;
+        const PERCENT_FEE = 0.0035;
         
-        console.log(`[${sessionId}] Calling withdraw(${amountSol}, "${recipient}")`);
+        // extAmount = what recipient gets (negative for withdrawal)
+        // fee = protocol fee
+        // extAmount + fee = total withdrawn from pool
+        const extAmount = Math.floor((poolBalanceLamports - FIXED_FEE_LAMPORTS) / (1 + PERCENT_FEE));
+        const fee = poolBalanceLamports - extAmount;
         
-        withdrawResult = await privacyCash.withdraw(amountSol, recipient);
+        console.log(`[${sessionId}] Calling withdraw with extAmount=${extAmount}, fee=${fee}, recipient=${session.recipientAddress}`);
+        
+        // Try passing as object with lamports
+        withdrawResult = await privacyCash.withdraw({
+          amount: poolBalanceLamports, // Total pool balance in lamports
+          recipient: session.recipientAddress,
+          extAmount: extAmount,
+          fee: fee
+        });
         break; // Success, exit loop
       } catch (retryErr: any) {
         lastError = retryErr;
