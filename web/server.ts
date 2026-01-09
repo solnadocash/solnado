@@ -323,12 +323,15 @@ app.post('/api/submit-deposit', async (req, res) => {
     let withdrawResult: any = null;
     let lastError: any = null;
     
-    // Try withdraw with just amount and recipient - let SDK handle fees
+    // Try withdraw with object params - SDK expects { lamports, recipientAddress }
     try {
-      console.log(`[${sessionId}] Attempting withdraw...`);
+      console.log(`[${sessionId}] Attempting withdraw of ${poolBalanceLamports} lamports to ${session.recipientAddress}...`);
       
-      // Try the simplest call: just amount in lamports and recipient
-      withdrawResult = await privacyCash.withdraw(poolBalanceLamports, session.recipientAddress);
+      // SDK expects object: { lamports, recipientAddress, referrer? }
+      withdrawResult = await privacyCash.withdraw({
+        lamports: poolBalanceLamports,
+        recipientAddress: session.recipientAddress
+      });
       
     } catch (err: any) {
       lastError = err;
