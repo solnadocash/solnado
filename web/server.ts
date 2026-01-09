@@ -340,12 +340,10 @@ app.post('/api/submit-deposit', async (req, res) => {
     
     console.log(`[${sessionId}] Pool balance: ${poolBalance} lamports (${poolBalance / LAMPORTS_PER_SOL} SOL)`);
     
-    // Calculate withdrawal with protocol fee (~3%)
-    const protocolFeeRate = 0.03;
-    const protocolFee = Math.ceil(poolBalance * protocolFeeRate);
-    const withdrawToRecipient = poolBalance - protocolFee;
+    // Withdraw full balance - SDK will calculate its own fee
+    const withdrawAmountSol = poolBalance / LAMPORTS_PER_SOL;
     
-    console.log(`[${sessionId}] Withdrawing ${withdrawToRecipient / LAMPORTS_PER_SOL} SOL to recipient (fee: ${protocolFee / LAMPORTS_PER_SOL} SOL)...`);
+    console.log(`[${sessionId}] Withdrawing ${withdrawAmountSol} SOL to recipient...`);
 
     let withdrawResult: any = null;
     let lastError: any = null;
@@ -354,11 +352,10 @@ app.post('/api/submit-deposit', async (req, res) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`[${sessionId}] Withdraw attempt ${attempt}/${maxRetries}...`);
-        // SDK expects extAmount (what recipient gets) and fee (protocol fee)
+        // SDK expects amount in SOL (not lamports) and recipient address
         withdrawResult = await privacyCash.withdraw({
-          extAmount: withdrawToRecipient,
-          fee: protocolFee,
-          recipientAddress: session.recipientAddress
+          amount: withdrawAmountSol,
+          recipient: session.recipientAddress
         });
         break; // Success, exit loop
       } catch (retryErr: any) {
