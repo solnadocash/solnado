@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Solnado</title>
+  <title>Solnado Cash</title>
   <link rel="icon" type="image/png" href="/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -270,7 +270,7 @@
     <div class="header">
       <img src="/logo.png" alt="Solnado" class="logo">
       <div>
-        <h1>Send SOL</h1>
+        <h1>Solnado Cash</h1>
         <p class="tagline">privacy where money-privacy doesn't reach</p>
       </div>
     </div>
@@ -296,12 +296,8 @@
         <input type="number" id="amount" placeholder="0.00" step="0.01" min="0.02" oninput="updateFeeDisplay()">
         <div class="fee-breakdown" id="feeBreakdown">
           <div class="fee-row">
-            <span>Protocol fee (~3%)</span>
+            <span>Privacy fee</span>
             <span id="protocolFee">-- SOL</span>
-          </div>
-          <div class="fee-row">
-            <span>Relayer fee</span>
-            <span id="relayerFee">0.001 SOL</span>
           </div>
           <div class="fee-row total">
             <span>Recipient gets</span>
@@ -319,7 +315,7 @@
         Send privately
       </button>
 
-      <p class="hint">~3% total fee (same as PrivacyCash)</p>
+      <p class="hint">~8% fee for small amounts, ~1% for larger transfers</p>
     </div>
 
     <!-- Transaction Flow Visualization -->
@@ -440,9 +436,9 @@
       }
     }
 
-    // Fee constants (must match server) - simple ~3% model like PrivacyCash
-    const RELAYER_FEE = 0.001;  // 0.001 SOL
-    const PROTOCOL_FEE_RATE = 0.03;  // ~3%
+    // Fee constants: 0.007 SOL fixed + 0.35% variable
+    const FIXED_FEE = 0.007;  // relayer + network fees
+    const VARIABLE_FEE_RATE = 0.0035;  // 0.35%
 
     function updateFeeDisplay() {
       const amount = parseFloat(document.getElementById('amount').value) || 0;
@@ -453,11 +449,12 @@
         return;
       }
       
-      // Simple: recipient gets amount minus fees
-      const protocolFee = amount * PROTOCOL_FEE_RATE;
-      const recipientGets = amount - protocolFee - RELAYER_FEE;
+      // Total fee = fixed + variable
+      const totalFee = FIXED_FEE + (amount * VARIABLE_FEE_RATE);
+      const recipientGets = amount - totalFee;
+      const feePct = (totalFee / amount * 100).toFixed(1);
       
-      document.getElementById('protocolFee').textContent = protocolFee.toFixed(4) + ' SOL';
+      document.getElementById('protocolFee').textContent = totalFee.toFixed(4) + ' SOL (~' + feePct + '%)';
       document.getElementById('recipientGets').textContent = recipientGets.toFixed(4) + ' SOL';
     }
 
