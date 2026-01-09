@@ -416,7 +416,7 @@
             <span class="fee-val" id="feeRecipient">0.00 SOL</span>
           </div>
           <div class="fee-row">
-            <span>Protocol fee (~6.2%)</span>
+            <span>Protocol fee (0.35% + 0.006)</span>
             <span class="fee-val" id="feeProtocol">0.00 SOL</span>
           </div>
           <div class="fee-row">
@@ -484,7 +484,7 @@
 
           <p>
             <strong style="color: var(--text);">Fees:</strong><br>
-            ~7% total (6.2% protocol fee + 0.001 SOL relayer). Recipient gets exact amount you enter.
+            ~0.8% total (0.35% + 0.006 SOL protocol + 0.001 SOL relayer). Recipient gets exact amount you enter.
           </p>
         </div>
       </div>
@@ -512,10 +512,13 @@
 
     window.updateFee = function() {
       const recipientGets = parseFloat(document.getElementById('amount').value) || 0;
-      const protocolFeeRate = 0.0623; // ~6.23%
+      // PrivacyCash fees: 0.35% of amount + 0.006 SOL fixed
+      const percentFee = 0.0035; // 0.35%
+      const fixedFee = 0.006; // SOL
       const relayerFee = 0.001; // SOL
-      // Pool needs: recipientGets / (1 - 0.0623) so recipient gets exact amount
-      const poolDeposit = recipientGets / (1 - protocolFeeRate);
+      
+      // Pool needs: (recipientGets + fixedFee) / (1 - 0.0035)
+      const poolDeposit = (recipientGets + fixedFee) / (1 - percentFee);
       const protocolFee = poolDeposit - recipientGets;
       const totalPay = poolDeposit + relayerFee;
       

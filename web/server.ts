@@ -143,13 +143,15 @@ const sessions = new Map<string, {
   error?: string;
 }>();
 
-// Fee constants - PrivacyCash takes ~6.23% from withdrawal
-const PROTOCOL_FEE_RATE = 0.0623; // ~6.23% PrivacyCash protocol fee (from actual logs)
+// Fee constants - PrivacyCash: 0.35% + 0.006 SOL fixed
+const PROTOCOL_PERCENT_FEE = 0.0035; // 0.35%
+const PROTOCOL_FIXED_FEE_LAMPORTS = 6_000_000; // 0.006 SOL
 const RELAYER_FEE_LAMPORTS = 1_000_000; // 0.001 SOL relayer fee
 
 /**
  * Calculate total sender must pay for recipient to get exact amount
  * Model: recipient gets X, sender pays X + all fees
+ * PrivacyCash fee: 0.35% + 0.006 SOL
  */
 function calculateTotalToPay(recipientAmountLamports: number): {
   totalToPay: number;
@@ -157,10 +159,8 @@ function calculateTotalToPay(recipientAmountLamports: number): {
   protocolFee: number;
   relayerFee: number;
 } {
-  // Pool needs enough so after 6.23% fee, recipient gets exact amount
-  // poolDeposit * (1 - 0.0623) = recipientAmount
-  // poolDeposit = recipientAmount / 0.9377
-  const poolDeposit = Math.ceil(recipientAmountLamports / (1 - PROTOCOL_FEE_RATE));
+  // Pool needs: (recipientAmount + fixedFee) / (1 - 0.0035)
+  const poolDeposit = Math.ceil((recipientAmountLamports + PROTOCOL_FIXED_FEE_LAMPORTS) / (1 - PROTOCOL_PERCENT_FEE));
   const protocolFee = poolDeposit - recipientAmountLamports;
   const totalToPay = poolDeposit + RELAYER_FEE_LAMPORTS;
   
@@ -340,24 +340,31 @@ app.post('/api/submit-deposit', async (req, res) => {
     // Step 3: Withdraw 100% from pool to recipient (NO CHANGE LEFT!)
     session.step = 'withdrawing';
     
-    // Get exact pool balance - SDK returns object with lamports property
+    // Get exact pool balance
     const balanceResult = await privacyCash.getPrivateBalance();
-    const poolBalanceLamports = typeof balanceResult === 'number' ? balanceResult : 
-                        (balanceResult?.lamports || balanceResult?.balance || depositAmount);
+    console.log(`[${sessionId}] Raw balance result:`, JSON.stringify(balanceResult));
     
-    console.log(`[${sessionId}] Pool balance: ${poolBalanceLamports} lamports (${poolBalanceLamports / LAMPORTS_PER_SOL} SOL)`);
+    // Handle different return formats from SDK
+    let poolBalanceLamports: number;
+    if (typeof balanceResult === 'number') {
+      poolBalanceLamports = balanceResult;
+    } else if (typeof balanceResult === 'object' && balanceResult !== null) {
+      poolBalanceLamports = Number(balanceResult.lamports || balanceResult.balance || balanceResult.amount || depositAmount);
+    } else {
+      poolBalanceLamports = depositAmount;
+    }
     
-    // Calculate withdrawal amounts in LAMPORTS
-    // Protocol takes ~6.23% fee, so: extAmount + fee = poolBalance
-    // fee = poolBalance * 0.0623 / (1 + 0.0623) ≈ poolBalance * 0.0587
-    // Actually from PrivacyCash: fee is calculated as ~3.35% of extAmount
-    // extAmount is what recipient gets (negative for withdrawal)
-    const FEE_RATE = 0.0335; // ~3.35% fee on withdrawal amount
-    const extAmountLamports = Math.floor(poolBalanceLamports / (1 + FEE_RATE));
-    const feeLamports = poolBalanceLamports - extAmountLamports;
+    const poolBalanceSol = poolBalanceLamports / LAMPORTS_PER_SOL;
+    console.log(`[${sessionId}] Pool balance: ${poolBalanceLamports} lamports (${poolBalanceSol} SOL)`);
     
-    console.log(`[${sessionId}] Withdrawing: extAmount=${extAmountLamports} lamports, fee=${feeLamports} lamports`);
-    console.log(`[${sessionId}] Recipient ${session.recipientAddress} gets ~${extAmountLamports / LAMPORTS_PER_SOL} SOL`);
+    // PrivacyCash fees: 0.35% + 0.006 SOL fixed
+    // Recipient gets: poolBalance - (poolBalance * 0.0035) - 0.006 SOL
+    const PERCENT_FEE = 0.0035; // 0.35%
+    const FIXED_FEE_SOL = 0.006; // 0.006 SOL
+    const estimatedRecipientSol = poolBalanceSol - (poolBalanceSol * PERCENT_FEE) - FIXED_FEE_SOL;
+    
+    console.log(`[${sessionId}] Withdrawing ${poolBalanceSol} SOL to ${session.recipientAddress}`);
+    console.log(`[${sessionId}] Estimated recipient receives: ~${estimatedRecipientSol.toFixed(6)} SOL (after 0.35% + 0.006 SOL fee)`);
 
     let withdrawResult: any = null;
     let lastError: any = null;
@@ -366,18 +373,20 @@ app.post('/api/submit-deposit', async (req, res) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`[${sessionId}] Withdraw attempt ${attempt}/${maxRetries}...`);
-        // SDK expects object with extAmount (negative), fee, and recipient
-        withdrawResult = await privacyCash.withdraw({
-          extAmount: -extAmountLamports, // NEGATIVE for withdrawal
-          fee: feeLamports,
-          recipient: session.recipientAddress
-        });
+        
+        // SDK takes amount in SOL and recipient address
+        // Fee is calculated internally by the SDK (0.35% + 0.006 SOL)
+        const amountSol = Number(poolBalanceSol);
+        const recipient = String(session.recipientAddress);
+        
+        console.log(`[${sessionId}] Calling withdraw(${amountSol}, "${recipient}")`);
+        
+        withdrawResult = await privacyCash.withdraw(amountSol, recipient);
         break; // Success, exit loop
       } catch (retryErr: any) {
         lastError = retryErr;
         console.log(`[${sessionId}] Withdraw attempt ${attempt} failed: ${retryErr.message}`);
         if (attempt < maxRetries) {
-          // Wait before retry, with increasing delay
           const delay = 5000 * attempt;
           console.log(`[${sessionId}] Waiting ${delay/1000}s before retry...`);
           await new Promise(r => setTimeout(r, delay));
