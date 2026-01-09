@@ -352,10 +352,10 @@ app.post('/api/submit-deposit', async (req, res) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`[${sessionId}] Withdraw attempt ${attempt}/${maxRetries}...`);
-        // SDK expects amount in SOL (not lamports) and recipient address
+        // Try with lamports and recipientAddress (matching SDK internal names)
         withdrawResult = await privacyCash.withdraw({
-          amount: withdrawAmountSol,
-          recipient: session.recipientAddress
+          lamports: poolBalance,
+          recipientAddress: session.recipientAddress
         });
         break; // Success, exit loop
       } catch (retryErr: any) {
