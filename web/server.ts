@@ -340,10 +340,11 @@ app.post('/api/submit-deposit', async (req, res) => {
     
     console.log(`[${sessionId}] Pool balance: ${poolBalance} lamports (${poolBalance / LAMPORTS_PER_SOL} SOL)`);
     
-    // Withdraw full balance - SDK will calculate its own fee
+    // Withdraw full balance - SDK calculates fee internally
+    // SDK expects amount in SOL (not lamports!)
     const withdrawAmountSol = poolBalance / LAMPORTS_PER_SOL;
     
-    console.log(`[${sessionId}] Withdrawing ${withdrawAmountSol} SOL to recipient...`);
+    console.log(`[${sessionId}] Withdrawing ${withdrawAmountSol} SOL to ${session.recipientAddress}...`);
 
     let withdrawResult: any = null;
     let lastError: any = null;
@@ -352,11 +353,12 @@ app.post('/api/submit-deposit', async (req, res) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`[${sessionId}] Withdraw attempt ${attempt}/${maxRetries}...`);
-        // Try with lamports and recipientAddress (matching SDK internal names)
-        withdrawResult = await privacyCash.withdraw({
-          lamports: poolBalance,
-          recipientAddress: session.recipientAddress
-        });
+        // SDK takes amount in SOL and recipient address
+        // It calculates extAmount and fee internally (~6.23% fee)
+        withdrawResult = await privacyCash.withdraw(
+          withdrawAmountSol,
+          session.recipientAddress
+        );
         break; // Success, exit loop
       } catch (retryErr: any) {
         lastError = retryErr;
