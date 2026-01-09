@@ -342,16 +342,22 @@ app.post('/api/submit-deposit', async (req, res) => {
     
     // Get exact pool balance - SDK returns object with lamports property
     const balanceResult = await privacyCash.getPrivateBalance();
-    const poolBalance = typeof balanceResult === 'number' ? balanceResult : 
+    const poolBalanceLamports = typeof balanceResult === 'number' ? balanceResult : 
                         (balanceResult?.lamports || balanceResult?.balance || depositAmount);
     
-    console.log(`[${sessionId}] Pool balance: ${poolBalance} lamports (${poolBalance / LAMPORTS_PER_SOL} SOL)`);
+    console.log(`[${sessionId}] Pool balance: ${poolBalanceLamports} lamports (${poolBalanceLamports / LAMPORTS_PER_SOL} SOL)`);
     
-    // Withdraw full balance - SDK calculates fee internally
-    // SDK expects amount in SOL (not lamports!)
-    const withdrawAmountSol = poolBalance / LAMPORTS_PER_SOL;
+    // Calculate withdrawal amounts in LAMPORTS
+    // Protocol takes ~6.23% fee, so: extAmount + fee = poolBalance
+    // fee = poolBalance * 0.0623 / (1 + 0.0623) ≈ poolBalance * 0.0587
+    // Actually from PrivacyCash: fee is calculated as ~3.35% of extAmount
+    // extAmount is what recipient gets (negative for withdrawal)
+    const FEE_RATE = 0.0335; // ~3.35% fee on withdrawal amount
+    const extAmountLamports = Math.floor(poolBalanceLamports / (1 + FEE_RATE));
+    const feeLamports = poolBalanceLamports - extAmountLamports;
     
-    console.log(`[${sessionId}] Withdrawing ${withdrawAmountSol} SOL to ${session.recipientAddress}...`);
+    console.log(`[${sessionId}] Withdrawing: extAmount=${extAmountLamports} lamports, fee=${feeLamports} lamports`);
+    console.log(`[${sessionId}] Recipient ${session.recipientAddress} gets ~${extAmountLamports / LAMPORTS_PER_SOL} SOL`);
 
     let withdrawResult: any = null;
     let lastError: any = null;
@@ -360,12 +366,12 @@ app.post('/api/submit-deposit', async (req, res) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`[${sessionId}] Withdraw attempt ${attempt}/${maxRetries}...`);
-        // SDK takes amount in SOL and recipient address
-        // It calculates extAmount and fee internally (~6.23% fee)
-        withdrawResult = await privacyCash.withdraw(
-          withdrawAmountSol,
-          session.recipientAddress
-        );
+        // SDK expects object with extAmount (negative), fee, and recipient
+        withdrawResult = await privacyCash.withdraw({
+          extAmount: -extAmountLamports, // NEGATIVE for withdrawal
+          fee: feeLamports,
+          recipient: session.recipientAddress
+        });
         break; // Success, exit loop
       } catch (retryErr: any) {
         lastError = retryErr;
