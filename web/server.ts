@@ -143,24 +143,30 @@ const sessions = new Map<string, {
   error?: string;
 }>();
 
-// Fee constants - PrivacyCash takes ~3% from withdrawal
-const PROTOCOL_FEE_RATE = 0.03; // ~3% PrivacyCash protocol fee
-const RELAYER_FEE_LAMPORTS = 1_000_000; // 0.001 SOL relayer fee (minimal)
+// Fee constants - PrivacyCash takes ~6.23% from withdrawal
+const PROTOCOL_FEE_RATE = 0.0623; // ~6.23% PrivacyCash protocol fee (from actual logs)
+const RELAYER_FEE_LAMPORTS = 1_000_000; // 0.001 SOL relayer fee
 
 /**
- * Calculate what recipient will receive after fees
- * Simple model: sender pays X, recipient gets X minus fees
+ * Calculate total sender must pay for recipient to get exact amount
+ * Model: recipient gets X, sender pays X + all fees
  */
-function calculateRecipientAmount(sendAmountLamports: number): {
-  recipientLamports: number;
+function calculateTotalToPay(recipientAmountLamports: number): {
+  totalToPay: number;
+  poolDeposit: number;
   protocolFee: number;
   relayerFee: number;
 } {
-  const protocolFee = Math.ceil(sendAmountLamports * PROTOCOL_FEE_RATE);
-  const recipientLamports = sendAmountLamports - protocolFee - RELAYER_FEE_LAMPORTS;
+  // Pool needs enough so after 6.23% fee, recipient gets exact amount
+  // poolDeposit * (1 - 0.0623) = recipientAmount
+  // poolDeposit = recipientAmount / 0.9377
+  const poolDeposit = Math.ceil(recipientAmountLamports / (1 - PROTOCOL_FEE_RATE));
+  const protocolFee = poolDeposit - recipientAmountLamports;
+  const totalToPay = poolDeposit + RELAYER_FEE_LAMPORTS;
   
   return {
-    recipientLamports,
+    totalToPay,
+    poolDeposit,
     protocolFee,
     relayerFee: RELAYER_FEE_LAMPORTS
   };
@@ -169,7 +175,7 @@ function calculateRecipientAmount(sendAmountLamports: number): {
 /**
  * POST /api/prepare-deposit
  * Step 1: User sends SOL to a FRESH temp wallet (max privacy)
- * Simple model: sender pays X, recipient gets X minus ~3% fees
+ * Model: user enters recipient amount, sender pays amount + all fees
  */
 app.post('/api/prepare-deposit', async (req, res) => {
   const { senderAddress, recipientAddress, amountSol } = req.body;
@@ -182,14 +188,14 @@ app.post('/api/prepare-deposit', async (req, res) => {
     return res.status(500).json({ error: 'Relayer not configured' });
   }
 
-  // This is what the SENDER is sending
-  const sendAmountLamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
+  // This is what the RECIPIENT should get
+  const recipientAmountLamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
   
-  // Calculate what recipient will get after fees
-  const fees = calculateRecipientAmount(sendAmountLamports);
+  // Calculate total sender must pay (recipient amount + all fees)
+  const fees = calculateTotalToPay(recipientAmountLamports);
 
-  if (fees.recipientLamports < 5_000_000) { // Min 0.005 SOL to recipient
-    return res.status(400).json({ error: 'Amount too small after fees' });
+  if (recipientAmountLamports < 5_000_000) { // Min 0.005 SOL to recipient
+    return res.status(400).json({ error: 'Amount too small' });
   }
 
   try {
@@ -199,14 +205,14 @@ app.post('/api/prepare-deposit', async (req, res) => {
     const sessionId = `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     
     // Generate FRESH wallet for this transaction (max privacy)
-    const tempWallet = generateTempWallet(sessionId, sendAmountLamports, recipientAddress);
+    const tempWallet = generateTempWallet(sessionId, fees.totalToPay, recipientAddress);
 
-    // User sends exactly what they entered (fees deducted from this)
+    // Sender pays: recipient amount + protocol fee + relayer fee
     const tx = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: sender,
         toPubkey: new PublicKey(tempWallet.publicKey),
-        lamports: sendAmountLamports
+        lamports: fees.totalToPay
       })
     );
 
@@ -220,21 +226,22 @@ app.post('/api/prepare-deposit', async (req, res) => {
     sessions.set(sessionId, {
       senderAddress,
       recipientAddress,
-      amountLamports: sendAmountLamports, // What sender is sending
+      amountLamports: fees.totalToPay, // Total sender pays
+      recipientLamports: recipientAmountLamports, // What recipient gets
       tempWalletPubkey: tempWallet.publicKey,
       step: 'pending'
     });
 
     setTimeout(() => sessions.delete(sessionId), 10 * 60 * 1000);
 
-    console.log(`[${sessionId}] Prepared: ${amountSol} SOL → recipient gets ~${fees.recipientLamports / LAMPORTS_PER_SOL} SOL`);
+    console.log(`[${sessionId}] Prepared: sender pays ${fees.totalToPay / LAMPORTS_PER_SOL} SOL → recipient gets ${amountSol} SOL`);
     res.json({ 
       sessionId, 
       unsignedTx: base64Tx,
       // Send fee breakdown to frontend
       fees: {
-        sendAmount: sendAmountLamports / LAMPORTS_PER_SOL,
-        recipientReceives: fees.recipientLamports / LAMPORTS_PER_SOL,
+        senderPays: fees.totalToPay / LAMPORTS_PER_SOL,
+        recipientGets: recipientAmountLamports / LAMPORTS_PER_SOL,
         protocolFee: fees.protocolFee / LAMPORTS_PER_SOL,
         relayerFee: fees.relayerFee / LAMPORTS_PER_SOL
       }
