@@ -266,15 +266,17 @@ app.post('/api/submit-deposit', async (req, res) => {
     console.log(`[${sessionId}] Sweeping temp wallet to main relayer...`);
     
     const tempBalance = await connection.getBalance(tempKeypair.publicKey);
-    const sweepFee = 5000; // Gas for sweep tx
+    const sweepFee = 5000; // Base tx fee
+    const priorityFeeCost = 50000; // Priority fee cost (~200 CU * 100000 microLamports)
     const RENT_EXEMPT_MIN = 890880; // ~0.00089 SOL - minimum to keep account alive
-    const sweepAmount = tempBalance - sweepFee - RENT_EXEMPT_MIN;
+    const totalFees = sweepFee + priorityFeeCost + RENT_EXEMPT_MIN;
+    const sweepAmount = tempBalance - totalFees;
     
     if (sweepAmount <= 0) {
       throw new Error('Temp wallet has insufficient funds to sweep (need > 0.001 SOL)');
     }
     
-    console.log(`[${sessionId}] Temp balance: ${tempBalance / LAMPORTS_PER_SOL} SOL, sweeping: ${sweepAmount / LAMPORTS_PER_SOL} SOL (keeping ${RENT_EXEMPT_MIN} for rent)`);
+    console.log(`[${sessionId}] Temp balance: ${tempBalance / LAMPORTS_PER_SOL} SOL, sweeping: ${sweepAmount / LAMPORTS_PER_SOL} SOL (reserving ${totalFees} lamports for fees+rent)`);
     
     const sweepTx = new Transaction().add(
       ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100000 }), // Priority fee for faster confirmation
