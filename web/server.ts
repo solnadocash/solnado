@@ -460,8 +460,9 @@ app.post('/api/admin/sweep-all', async (req, res) => {
       const keypair = Keypair.fromSecretKey(bs58.decode(wallet.secretKey));
       const balance = await connection.getBalance(keypair.publicKey);
       
-      if (balance > 5000) { // More than just rent
-        const sweepAmount = balance - 5000;
+      const TOTAL_FEES = 5000 + 50000 + 890880; // base + priority + rent-exempt
+      if (balance > TOTAL_FEES) {
+        const sweepAmount = balance - TOTAL_FEES;
         const tx = new Transaction().add(
           ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100000 }), // Priority fee
           SystemProgram.transfer({
@@ -520,11 +521,12 @@ app.post('/api/admin/sweep-one', async (req, res) => {
     const keypair = Keypair.fromSecretKey(bs58.decode(wallet.secretKey));
     const balance = await connection.getBalance(keypair.publicKey);
 
-    if (balance <= 5000) {
-      return res.json({ success: true, swept: 0, message: 'Wallet empty' });
+    const TOTAL_FEES = 5000 + 50000 + 890880; // base + priority + rent-exempt
+    if (balance <= TOTAL_FEES) {
+      return res.json({ success: true, swept: 0, message: 'Wallet has insufficient balance to sweep' });
     }
-
-    const sweepAmount = balance - 5000;
+    
+    const sweepAmount = balance - TOTAL_FEES;
     const tx = new Transaction().add(
       ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100000 }), // Priority fee
       SystemProgram.transfer({
