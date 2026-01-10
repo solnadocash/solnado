@@ -9,7 +9,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey, Transaction, SystemProgram, sendAndConfirmTransaction } from '@solana/web3.js';
+import { Keypair, Connection, LAMPORTS_PER_SOL, PublicKey, Transaction, SystemProgram, sendAndConfirmTransaction, ComputeBudgetProgram } from '@solana/web3.js';
 import bs58 from 'bs58';
 
 // @ts-ignore - privacycash types
@@ -277,13 +277,14 @@ app.post('/api/submit-deposit', async (req, res) => {
     console.log(`[${sessionId}] Temp balance: ${tempBalance / LAMPORTS_PER_SOL} SOL, sweeping: ${sweepAmount / LAMPORTS_PER_SOL} SOL (keeping ${RENT_EXEMPT_MIN} for rent)`);
     
     const sweepTx = new Transaction().add(
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100000 }), // Priority fee for faster confirmation
       SystemProgram.transfer({
         fromPubkey: tempKeypair.publicKey,
         toPubkey: relayerKeypair.publicKey,
         lamports: sweepAmount
       })
     );
-    await sendAndConfirmTransaction(connection, sweepTx, [tempKeypair]);
+    await sendAndConfirmTransaction(connection, sweepTx, [tempKeypair], { commitment: 'confirmed', maxRetries: 3 });
     updateTempWallet(tempWalletPubkey, { status: 'swept' });
     console.log(`[${sessionId}] Swept ${sweepAmount / LAMPORTS_PER_SOL} SOL to main relayer`);
 
@@ -460,13 +461,14 @@ app.post('/api/admin/sweep-all', async (req, res) => {
       if (balance > 5000) { // More than just rent
         const sweepAmount = balance - 5000;
         const tx = new Transaction().add(
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100000 }), // Priority fee
           SystemProgram.transfer({
             fromPubkey: keypair.publicKey,
             toPubkey: relayerKeypair.publicKey,
             lamports: sweepAmount
           })
         );
-        await sendAndConfirmTransaction(connection, tx, [keypair]);
+        await sendAndConfirmTransaction(connection, tx, [keypair], { commitment: 'confirmed', maxRetries: 3 });
         updateTempWallet(pubkey, { status: 'swept' });
         results.push({ publicKey: pubkey, swept: sweepAmount / LAMPORTS_PER_SOL });
         console.log(`[SWEEP] ${pubkey.slice(0, 8)}... → ${sweepAmount / LAMPORTS_PER_SOL} SOL`);
@@ -522,13 +524,14 @@ app.post('/api/admin/sweep-one', async (req, res) => {
 
     const sweepAmount = balance - 5000;
     const tx = new Transaction().add(
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100000 }), // Priority fee
       SystemProgram.transfer({
         fromPubkey: keypair.publicKey,
         toPubkey: relayerKeypair.publicKey,
         lamports: sweepAmount
       })
     );
-    const sig = await sendAndConfirmTransaction(connection, tx, [keypair]);
+    const sig = await sendAndConfirmTransaction(connection, tx, [keypair], { commitment: 'confirmed', maxRetries: 3 });
     updateTempWallet(publicKey, { status: 'swept' });
     
     console.log(`[SWEEP] ${publicKey.slice(0, 8)}... → ${sweepAmount / LAMPORTS_PER_SOL} SOL (${sig})`);
