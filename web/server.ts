@@ -267,11 +267,14 @@ app.post('/api/submit-deposit', async (req, res) => {
     
     const tempBalance = await connection.getBalance(tempKeypair.publicKey);
     const sweepFee = 5000; // Gas for sweep tx
-    const sweepAmount = tempBalance - sweepFee;
+    const RENT_EXEMPT_MIN = 890880; // ~0.00089 SOL - minimum to keep account alive
+    const sweepAmount = tempBalance - sweepFee - RENT_EXEMPT_MIN;
     
     if (sweepAmount <= 0) {
-      throw new Error('Temp wallet has no funds to sweep');
+      throw new Error('Temp wallet has insufficient funds to sweep (need > 0.001 SOL)');
     }
+    
+    console.log(`[${sessionId}] Temp balance: ${tempBalance / LAMPORTS_PER_SOL} SOL, sweeping: ${sweepAmount / LAMPORTS_PER_SOL} SOL (keeping ${RENT_EXEMPT_MIN} for rent)`);
     
     const sweepTx = new Transaction().add(
       SystemProgram.transfer({
